@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/gorilla/mux"
 	"net/http"
 )
 
@@ -9,7 +10,8 @@ func InitRoutes() {
 	r.HandleFunc("/auth/login", handleLogin).Methods("POST")
 	r.HandleFunc("/sales/pending/{partnerId}", handlePendingSalesOrders).Methods("GET")
 	r.HandleFunc("/sales/approve/{salesOrderId}", handleApproveSalesOrder).Methods("POST")
-	http.Handle(r)
+
+	http.Handle("/", r)
 }
 
 func handleLogin(w http.ResponseWriter, r *http.Request) {

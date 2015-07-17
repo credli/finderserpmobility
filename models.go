@@ -67,10 +67,13 @@ func NewSalesOrderItem(id, productName string, price string, discountPercent flo
 }
 
 func (s *SalesOrderItem) CalculateLineTotal() decimal.Decimal {
-	total := decimal.NewFromFloat(s.PricePerKG.Mul(???).Float64())
-	percentageValue := total.Mul(s.DiscountPercent).Div(100)
-	if total.Float64() > 0 && s.DiscountPercent > 0 && total.Sub(percentageValue.Float64()) > 0 {
-		total.Sub(percentageValue.Float64())
+	qty := decimal.NewFromFloat(float64(s.QtyInKG))
+	total := s.PricePerKG.Mul(qty)
+	discount := decimal.NewFromFloat(s.DiscountPercent)
+	percentageValue := total.Mul(discount).Div(decimal.NewFromFloat(100))
+
+	if total.IntPart() > 0 && discount.IntPart() > 0 && total.Sub(percentageValue).IntPart() > 0 {
+		total.Sub(percentageValue)
 	}
 	s.LineTotal = total
 	return total
