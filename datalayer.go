@@ -2,22 +2,14 @@ package main
 
 import (
 	"database/sql"
-	"flag"
+	"errors"
 	"fmt"
 	_ "github.com/alexbrainman/odbc"
 	"runtime"
+	"strings"
 )
 
-var (
-	dbDriver = flag.String("dbDriver", defaultDriver(), "MSSQL ODBC driver name")
-	dbHost   = flag.String("dbHost", "j7dpgj7zuc.database.secure.windows.net", "Database Host DNS or IP address")
-	dbPort   = flag.Int("dbPort", 1433, "Database Port, defaults to 1433")
-	dbName   = flag.String("dbName", "FindersERPDB", "Database name")
-	dbUser   = flag.String("dbUser", "finderserp@j7dpgj7zuc", "Database user")
-	dbPass   = flag.String("dbPass", "Pl@c10!@#", "Database password")
-)
-
-func defautDriver() {
+func GetDefaultDriver() string {
 	if runtime.GOOS == "windows" {
 		return "sql server"
 	} else {
@@ -25,7 +17,7 @@ func defautDriver() {
 	}
 }
 
-func isFreeTDS() {
+func isFreeTDS() bool {
 	return *dbDriver == "freetds"
 }
 
@@ -33,14 +25,50 @@ type connParams map[string]string
 
 func newConnParams() connParams {
 	params := connParams{
-		"driver":   dbDriver,
-		"server":   dbHost,
-		"database": dbName,
+		"driver":   *dbDriver,
+		"server":   *dbHost,
+		"database": *dbName,
 	}
 	if isFreeTDS() {
 		params["uid"] = *dbUser
+		params["pwd"] = *dbPass
+		params["port"] = *dbPort
+	} else {
+		if len(*dbUser) == 0 {
+			params["trusted_connection"] = "yes"
+		} else {
+			params["uid"] = *dbUser
+			params["pwd"] = *dbPass
+		}
 	}
+	a := strings.SplitN(params["server"], ",", -1)
+	if len(a) == 2 {
+		params["server"] = a[0]
+		params["port"] = a[1]
+	}
+	return params
+}
 
+func (params connParams) getConnAddress() (string, error) {
+	port, ok := params["port"]
+	if !ok {
+		return "", errors.New("no port number provided")
+	}
+	host, ok := params["server"]
+	if !ok {
+		return "", errors.New("no host name provided")
+	}
+	return host + ":" + port, nil
+}
+
+func (params connParams) updateConnAddress(address string) error {
+	a := strings.SplitN(address, ":", -1)
+	if len(a) != 2 {
+		fmt.Errorf("listen address must have to fields, but %d found", len(a))
+	}
+	params["server"] = a[0]
+	params["port"] = a[1]
+	return nil
 }
 
 func ConnectDatabase() {

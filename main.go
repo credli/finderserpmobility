@@ -8,8 +8,9 @@ import (
 )
 
 var (
+	dbDriver = flag.String("dbDriver", GetDefaultDriver(), "MSSQL ODBC driver name")
 	dbHost   = flag.String("DbHost", ".", "MSSQL server host name")
-	dbPort   = flag.Int("DbPort", 1433, "MSSQL server port number")
+	dbPort   = flag.String("DbPort", "1433", "MSSQL server port number")
 	dbName   = flag.String("DbName", "FindersERPDB", "Database name")
 	dbUser   = flag.String("DbUser", "sa", "Database login")
 	dbPass   = flag.String("DbPass", "P@ssw0rd", "Login password")
