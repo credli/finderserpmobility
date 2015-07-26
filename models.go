@@ -111,8 +111,6 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 				salesOrder.AddItem(salesOrderItem)
 			}
 			rows2.Close()
-		} else {
-			log.Println("Not including items...")
 		}
 
 		salesOrders = append(salesOrders, salesOrder)
@@ -121,8 +119,12 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 	return salesOrders, nil
 }
 
-// func (s *SalesOrderRepository) ApproveSalesOrder(salesOrderId string) error {
-
+// func (s *SalesOrderRepository) ApproveSalesOrder(userId string, salesOrderId string) error {
+// 	db := s.db.GetDatabase()
+// 	if db == nil {
+// 		panic("Database object was returned empty")
+// 	}
+// 	defer db.Close()
 // }
 
 type SalesOrder struct {

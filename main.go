@@ -1,8 +1,8 @@
 package main
 
 import (
-	c "./config"
 	"fmt"
+	c "github.com/credli/finderserpmobility/config"
 	"log"
 	"net/http"
 )

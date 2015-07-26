@@ -23,7 +23,6 @@ func handlePendingSalesOrders(w http.ResponseWriter, r *http.Request) {
 	inclItm := false
 	if includeItems != "" {
 		inclItm, _ = strconv.ParseBool(includeItems)
-		log.Printf("includeItems: %s inclItm: %d\n", includeItems, inclItm)
 	}
 	partnerId := vars["partnerId"] //"DD9B4E55-958B-42C6-866F-8C18EDDCE076"
 	var salesOrders []*SalesOrder
