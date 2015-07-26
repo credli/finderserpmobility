@@ -1,27 +1,31 @@
 package data
 
-type User struct {
-	UserId   string
-	UserName string
-	Password string
-	Email    string
-}
+// import (
+// 	"database/sql"
+// )
 
-type UserRepository struct {
-	Repository
-	db *Database
-}
+// type User struct {
+// 	UserId   string
+// 	UserName string
+// 	Password string
+// 	Email    string
+// }
 
-func NewUserRepository(db *Database) *UserRepository {
-	return &UserRepository{
-		db: db,
-	}
-}
+// type UserRepository struct {
+// 	Repository
+// 	db *Database
+// }
 
-func (s *SalesOrderRepository) GetDb() *sql.DB {
-	return s.db.db
-}
+// func NewUserRepository(db *Database) *UserRepository {
+// 	return &UserRepository{
+// 		db: db,
+// 	}
+// }
 
-func (s *SalesOrderRepository) GetUserByUserName(string username) *User {
+// func (u *UserRepository) GetDb() *sql.DB {
+// 	return u.db.GetDatabase()
+// }
 
-}
+// func (u *UserRepository) GetUserByUserName(string username) *User {
+
+// }

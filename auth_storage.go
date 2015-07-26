@@ -15,14 +15,14 @@ type AuthStorage struct {
 }
 
 func NewAuthStorage() *AuthStorage {
-	r = &AuthStorage{
+	r := &AuthStorage{
 		clients:   make(map[string]osin.Client),
 		authorize: make(map[string]*osin.AuthorizeData),
 		access:    make(map[string]*osin.AccessData),
 		refresh:   make(map[string]string),
 	}
 
-	r.db, err := sql.Open(driverName, dataSourceName)
+	//r.db, err := sql.Open(driverName, dataSourceName)
 
 	r.clients["finderserpapp"] = &osin.DefaultClient{
 		Id:          "finderserpapp",
