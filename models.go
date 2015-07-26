@@ -1,12 +1,13 @@
 package main
 
 import (
+	"code.google.com/p/go-uuid/uuid"
 	"github.com/shopspring/decimal"
 	"time"
 )
 
 type SalesOrder struct {
-	ID           string            `json: "id"`
+	ID           uuid.UUID         `json: "id"`
 	SeqNumber    int               `json: "seqNumber"`
 	AddedBy      string            `json: "addedBy"`
 	AddedDate    time.Time         `json: "addedDate"`
@@ -15,7 +16,7 @@ type SalesOrder struct {
 	GrandTotal   decimal.Decimal   `json: "grandTotal"`
 }
 
-func NewSalesOrder(id string, seq int, addedBy string, addedDate time.Time, customerName string) *SalesOrder {
+func NewSalesOrder(id uuid.UUID, seq int, addedBy string, addedDate time.Time, customerName string) *SalesOrder {
 	return &SalesOrder{
 		ID:           id,
 		SeqNumber:    seq,
