@@ -9,108 +9,60 @@ import (
 )
 
 type Repository interface {
-	GetDb() *sql.DB
-}
-
-type Database struct {
-	db               *sql.DB
-	driverName       string
-	connectionString string
-}
-
-func NewDatabase(driverName string, connectionString string) *Database {
-	if driverName == "" || connectionString == "" {
-		log.Panicln("Both driver name and connection string are required")
-	}
-	db, err := sql.Open(driverName, connectionString)
-	if err != nil {
-		log.Panicf("%s\n", err.Error())
-	}
-	return &Database{
-		db: db,
-	}
-}
-
-func (d *Database) Open() (*sql.DB, error) {
-	return sql.Open(d.driverName, d.connectionString)
-}
-
-func (d *Database) GetDriverName() string {
-	return d.driverName
-}
-
-func (d *Database) GetConnectionString() string {
-	return d.connectionString
-}
-
-func (d *Database) GetDatabase() *sql.DB {
-	return d.db
-}
-
-func (d *Database) Close() {
-	d.db.Close()
 }
 
 type SalesOrderRepository struct {
 	Repository
-	db *Database
+	db *sql.DB
 }
 
-func NewSalesOrderRepository(db *Database) *SalesOrderRepository {
+func NewSalesOrderRepository(db *sql.DB) *SalesOrderRepository {
 	return &SalesOrderRepository{
 		db: db,
 	}
 }
 
-func (s *SalesOrderRepository) GetDb() *sql.DB {
-	return s.db.db
-}
-
 func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeItems bool) ([]*SalesOrder, error) {
-	db := s.db.GetDatabase()
-	if db == nil {
-		panic("Database object was returned empty")
-	}
-	defer db.Close()
-
 	salesOrders := make([]*SalesOrder, 0)
-	rows, err := s.db.GetDatabase().Query("exec Mobile_GetPendingSalesOrders @PartnerID = ?;", partnerId)
+	rows, err := s.db.Query("exec Mobile_GetPendingSalesOrders @PartnerID = ?;", partnerId)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var id uuid.UUID
-		var seqNumber int
-		var addedBy string
-		var addedDate time.Time
-		var customerName string
+		var (
+			id           uuid.UUID
+			seqNumber    int
+			addedBy      string
+			addedDate    time.Time
+			customerName string
+		)
 		rows.Scan(&id, &seqNumber, &addedBy, &addedDate, &customerName)
-		id = toLittleEndian(id)
 		salesOrder := NewSalesOrder(id, seqNumber, addedBy, addedDate, customerName)
 
 		if includeItems == true {
-			rows2, err := s.db.GetDatabase().Query("exec Mobile_GetSalesOrderItems @SalesOrderID = ?;", salesOrder.ID.String())
+			rows2, err := s.db.Query("exec Mobile_GetSalesOrderItems @SalesOrderID = ?;", salesOrder.ID.String())
 			if err != nil {
 				return nil, err
 			}
+			defer rows2.Close()
+
 			for rows2.Next() {
-				var soId uuid.UUID
-				var salesoid uuid.UUID
-				var productName string
-				var pricePerKg decimal.Decimal
-				var discountPercentage float64
-				var unitName string
-				var qtyInKg int
-				var deliveryDeadline time.Time
+				var (
+					soId               uuid.UUID
+					salesoid           uuid.UUID
+					productName        string
+					pricePerKg         decimal.Decimal
+					discountPercentage float64
+					unitName           string
+					qtyInKg            int
+					deliveryDeadline   time.Time
+				)
 				rows2.Scan(&soId, &salesoid, &productName, &pricePerKg, &discountPercentage, &unitName, &qtyInKg, &deliveryDeadline)
-				soId = toLittleEndian(soId)
-				salesoid = toLittleEndian(salesoid)
 				salesOrderItem := NewSalesOrderItem(soId, productName, pricePerKg, discountPercentage, unitName, qtyInKg, deliveryDeadline)
 				salesOrder.AddItem(salesOrderItem)
 			}
-			rows2.Close()
 		}
 
 		salesOrders = append(salesOrders, salesOrder)
@@ -119,13 +71,14 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 	return salesOrders, nil
 }
 
-// func (s *SalesOrderRepository) ApproveSalesOrder(userId string, salesOrderId string) error {
-// 	db := s.db.GetDatabase()
-// 	if db == nil {
-// 		panic("Database object was returned empty")
-// 	}
-// 	defer db.Close()
-// }
+func (s *SalesOrderRepository) ApproveSalesOrder(salesOrderId string, generateDeliveryRequest bool, userId string) error {
+	stmt, err := s.db.Prepare("exec Mobile_ApproveSalesOrder @SalesOrderID = ?, @GenerateDeliveryRequest = ?, @UserID = ?;")
+	if err != nil {
+		return err
+	}
+	_, err = stmt.Exec(salesOrderId, generateDeliveryRequest, userId)
+	return err
+}
 
 type SalesOrder struct {
 	ID           uuid.UUID         `json:"id"`
@@ -138,8 +91,9 @@ type SalesOrder struct {
 }
 
 func NewSalesOrder(id uuid.UUID, seq int, addedBy string, addedDate time.Time, customerName string) *SalesOrder {
+	leid := toLittleEndian(id)
 	return &SalesOrder{
-		ID:           id,
+		ID:           leid,
 		SeqNumber:    seq,
 		AddedBy:      addedBy,
 		AddedDate:    addedDate,
@@ -175,8 +129,9 @@ type SalesOrderItem struct {
 }
 
 func NewSalesOrderItem(id uuid.UUID, productName string, price decimal.Decimal, discountPercent float64, unitName string, qty int, deliveryDeadline time.Time) *SalesOrderItem {
+	leid := toLittleEndian(id)
 	return &SalesOrderItem{
-		ID:               id,
+		ID:               leid,
 		ProductName:      productName,
 		PricePerKG:       price,
 		DiscountPercent:  discountPercent,
@@ -199,34 +154,98 @@ func (s *SalesOrderItem) CalculateLineTotal() decimal.Decimal {
 	return total
 }
 
-func toLittleEndian(largeEndian uuid.UUID) uuid.UUID {
-	littleEndian := uuid.NewUUID()
-	for i := 8; i < 16; i++ {
-		littleEndian[i] = largeEndian[i]
-	}
-	littleEndian[3] = largeEndian[0]
-	littleEndian[2] = largeEndian[1]
-	littleEndian[1] = largeEndian[2]
-	littleEndian[0] = largeEndian[3]
-	littleEndian[5] = largeEndian[4]
-	littleEndian[4] = largeEndian[5]
-	littleEndian[7] = largeEndian[6]
-	littleEndian[6] = largeEndian[7]
-	return littleEndian
+type User struct {
+	UserId     uuid.UUID `json:"userId"`
+	UserName   string    `json:"username"`
+	Password   string    `json:"-"`
+	PartnerID  uuid.UUID `json:"partnerId"`
+	LoggedInAt time.Time `json:"loggedInAt"`
 }
 
-func toLargeEndian(littleEndian uuid.UUID) uuid.UUID {
-	largeEndian := uuid.NewUUID()
-	for i := 8; i < 16; i++ {
-		largeEndian[i] = littleEndian[i]
+func NewUser(id uuid.UUID, username string, password string, partnerID uuid.UUID) *User {
+	leid := toLittleEndian(id)
+	lepartnerID := toLittleEndian(partnerID)
+	return &User{
+		UserId:     leid,
+		UserName:   username,
+		Password:   password,
+		PartnerID:  lepartnerID,
+		LoggedInAt: time.Now(),
 	}
-	largeEndian[0] = littleEndian[3]
-	largeEndian[1] = littleEndian[2]
-	largeEndian[2] = littleEndian[1]
-	largeEndian[3] = littleEndian[0]
-	largeEndian[4] = littleEndian[5]
-	largeEndian[5] = littleEndian[4]
-	largeEndian[6] = littleEndian[7]
-	largeEndian[7] = littleEndian[6]
-	return largeEndian
+}
+
+type UserRepository struct {
+	Repository
+	db *sql.DB
+}
+
+func NewUserRepository(db *sql.DB) *UserRepository {
+	return &UserRepository{
+		db: db,
+	}
+}
+
+func (u *UserRepository) GetUser(userId uuid.UUID) (*User, error) {
+	var (
+		UserId    uuid.UUID
+		UserName  string
+		Password  string
+		PartnerID uuid.UUID
+	)
+	row := u.db.QueryRow(`SELECT a.UserId, a.UserName, b.Password, d.ID AS PartnerID FROM aspnet_Users AS a
+		INNER JOIN aspnet_Membership AS b ON a.UserId = b.UserId
+		INNER JOIN PartnerUsers AS c ON c.UserID = a.UserId
+		INNER JOIN Partners AS d ON d.ID = c.PartnerID
+		WHERE a.UserId = ?`, userId.String())
+	err := row.Scan(&UserId, &UserName, &Password, &PartnerID)
+	if err != nil {
+		log.Printf("Error in GetUser: %s", err)
+		return nil, err
+	}
+	if UserName == "" {
+		return nil, nil
+	}
+	return NewUser(UserId, UserName, Password, PartnerID), nil
+}
+
+func (u *UserRepository) Login(name string, pass string) (*User, error) {
+	var (
+		UserId    uuid.UUID
+		UserName  string
+		Password  string
+		PartnerID uuid.UUID
+	)
+	row := u.db.QueryRow(`SELECT a.UserId, a.UserName, b.Password, d.ID AS PartnerID FROM aspnet_Users AS a
+		INNER JOIN aspnet_Membership AS b ON a.UserId = b.UserId
+		INNER JOIN PartnerUsers AS c ON c.UserID = a.UserId
+		INNER JOIN Partners AS d ON d.ID = c.PartnerID
+		WHERE a.UserName = ? AND b.Password = ?`, name, pass)
+	err := row.Scan(&UserId, &UserName, &Password, &PartnerID)
+	if err != nil {
+		return nil, err
+	}
+	if UserName == "" {
+		return nil, nil
+	}
+	return NewUser(UserId, UserName, Password, PartnerID), nil
+}
+
+func (u *UserRepository) UserHasAdminPrivileges(userId uuid.UUID) (bool, error) {
+	var ()
+	rows, err := u.db.Query(`SELECT c.RoleName FROM aspnet_Users AS a
+		INNER JOIN aspnet_UsersInRoles AS b ON a.UserId = b.UserId
+		INNER JOIN aspnet_Roles AS c ON c.RoleId = b.RoleId
+		WHERE a.UserId = ? AND c.RoleName = ? OR c.RoleName = ? OR c.RoleName = ?`, userId.String(), "Administrators", "SalesManager", "MarketingManager")
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	result := false
+	for rows.Next() {
+		result = true
+		break
+	}
+
+	return result, nil
 }

@@ -1,0 +1,25 @@
+{
+  "name": "finderserpmobility",
+  "version": "1.0.0",
+  "homepage": "https://github.com/credli/finderserpmobility",
+  "authors": [
+    "Nicholas Credli <nicholas.credli@gmail.com>"
+  ],
+  "description": "Mobility suite API for FindersERP",
+  "main": "index.html",
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "angularjs": "~1.4.3",
+    "angular-bootstrap": "~0.13.1",
+    "angular-ui-router": "~0.2.15",
+    "bootstrap": "~3.3.5",
+    "jquery": "~2.1.4"
+  }
+}
