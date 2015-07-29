@@ -2,6 +2,8 @@ package main
 
 import (
 	"database/sql"
+	"errors"
+	"fmt"
 	"github.com/RangelReale/osin"
 	"github.com/pborman/uuid"
 	"log"
@@ -64,18 +66,16 @@ func (s *AuthStorage) RemoveClient(id string) error {
 
 func (s *AuthStorage) SaveAuthorize(auth *osin.AuthorizeData) error {
 	log.Printf("UserData: %s\n", auth.UserData)
-	var userId *uuid.UUID
-	if user, ok := auth.UserData.(*User); ok == true {
-		userId = &user.UserId
-	}
-	log.Printf("userId at this point is %s", userId)
+	user := auth.UserData.(*User)
+
 	stmt, err := s.db.Prepare(`
 		INSERT INTO authorize_data(code, expires_in, scope, redirect_uri, state, created_at, client_id, user_id)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
-	_, err = stmt.Exec(auth.Code, auth.ExpiresIn, auth.Scope, auth.RedirectUri, auth.State, auth.CreatedAt, auth.Client.GetId(), userId.String())
+
+	_, err = stmt.Exec(auth.Code, auth.ExpiresIn, auth.Scope, auth.RedirectUri, auth.State, auth.CreatedAt, auth.Client.GetId(), user.UserId.String())
 	return err
 }
 
@@ -88,7 +88,7 @@ func (s *AuthStorage) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 		state       string
 		createdAt   time.Time
 		clientID    string
-		userID      *uuid.UUID
+		userID      uuid.UUID
 	)
 
 	row := s.db.QueryRow("SELECT * FROM authorize_data WHERE code = ?", code)
@@ -102,12 +102,12 @@ func (s *AuthStorage) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 		return nil, err
 	}
 
-	var user *User
-	if userID != nil {
-		uid := toLittleEndian(*userID)
-		user, _ = userRepo.GetUser(uid)
-		log.Printf("Yo! user: %s\n%s\n%s\n", user, userID, uid)
+	uid := toLittleEndian(userID)
+	user, err := userRepo.GetUser(uid)
+	if err != nil {
+		return nil, err
 	}
+	log.Printf("Yo! user: %s\n%s\n%s\n", user.UserName)
 
 	authData := &osin.AuthorizeData{
 		Code:        authCode,
@@ -134,11 +134,8 @@ func (s *AuthStorage) RemoveAuthorize(code string) error {
 
 func (s *AuthStorage) SaveAccess(access *osin.AccessData) error {
 	log.Printf("UserData: %s\n", access.UserData)
-	var userId *uuid.UUID
-	if user, ok := access.UserData.(*User); ok == true {
-		userId = &user.UserId
-	}
-	log.Printf("userId at this point is %s", userId)
+	user := access.UserData.(*User)
+	log.Printf("user at this point is %s", user)
 	stmt, err := s.db.Prepare(`
 		INSERT INTO access_data(access_token, refresh_token, expires_in,
 			scope, redirect_uri, created_at, authorize_data_code, prev_access_data_token, client_id, user_id)
@@ -158,7 +155,7 @@ func (s *AuthStorage) SaveAccess(access *osin.AccessData) error {
 	}
 
 	_, err = stmt.Exec(access.AccessToken, access.RefreshToken, access.ExpiresIn, access.Scope,
-		access.RedirectUri, access.CreatedAt, authDataCode, prevAccessDataToken, access.Client.GetId(), userId.String())
+		access.RedirectUri, access.CreatedAt, authDataCode, prevAccessDataToken, access.Client.GetId(), user.UserId.String())
 	return err
 }
 
@@ -173,7 +170,7 @@ func (s *AuthStorage) loadAccess(token string, isRefresh ...bool) (*osin.AccessD
 		authorizeDataCode   string
 		prevAccessDataToken string
 		clientID            string
-		userID              *uuid.UUID
+		userID              uuid.UUID
 	)
 
 	var rows *sql.Rows
@@ -183,6 +180,7 @@ func (s *AuthStorage) loadAccess(token string, isRefresh ...bool) (*osin.AccessD
 	} else {
 		rows, err = s.db.Query("SELECT * FROM access_data WHERE access_token = ?", token)
 	}
+
 	defer rows.Close()
 
 	for rows.Next() {
@@ -194,12 +192,22 @@ func (s *AuthStorage) loadAccess(token string, isRefresh ...bool) (*osin.AccessD
 		break
 	}
 
-	var user *User
-	if userID != nil {
-		uid := toLittleEndian(*userID)
-		user, _ = userRepo.GetUser(uid)
+	if accessToken == "" {
+		whichToken := "token"
+		if len(isRefresh) > 0 && isRefresh[0] == true {
+			whichToken = "refresh"
+		}
+		return nil, "", "", "", errors.New(fmt.Sprintf("%s %s was not scanned", whichToken, token))
 	}
 
+	log.Printf("userID: %s\n", userID)
+	uid := toLittleEndian(userID)
+	user, err := userRepo.GetUser(uid)
+	if err != nil {
+		return nil, "", "", "", err
+	}
+
+	log.Println("returning function with err: %s", err)
 	return &osin.AccessData{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
@@ -212,15 +220,18 @@ func (s *AuthStorage) loadAccess(token string, isRefresh ...bool) (*osin.AccessD
 }
 
 func (s *AuthStorage) LoadAccess(token string) (*osin.AccessData, error) {
-	accessData, _, prevAccessDataToken, clientID, err := s.loadAccess(token)
-	//load previous access data if the token is not empty
-	var prevAccessData *osin.AccessData
-	if prevAccessDataToken != "" {
-		prevAccessData, _, _, _, err = s.loadAccess(prevAccessDataToken)
-		if err != nil {
-			return nil, err
-		}
+	accessData, _, _, clientID, err := s.loadAccess(token)
+	if err != nil {
+		return nil, err
 	}
+	//load previous access data if the token is not empty
+	// var prevAccessData *osin.AccessData
+	// if prevAccessDataToken != "" {
+	// 	prevAccessData, _, _, _, err = s.loadAccess(prevAccessDataToken)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// }
 	//load client data
 	client, err := s.GetClient(clientID)
 	if err != nil {
@@ -231,7 +242,8 @@ func (s *AuthStorage) LoadAccess(token string) (*osin.AccessData, error) {
 
 	accessData.Client = client
 	//accessData.AuthorizeData = authData
-	accessData.AccessData = prevAccessData
+	//accessData.AccessData = prevAccessData
+
 	return accessData, err
 }
 
@@ -245,26 +257,29 @@ func (s *AuthStorage) RemoveAccess(token string) error {
 }
 
 func (s *AuthStorage) LoadRefresh(token string) (*osin.AccessData, error) {
-	accessData, authDataCode, prevAccessDataToken, clientID, err := s.loadAccess(token, true)
-	//load previous access data if token is not empty
-	var prevAccessData *osin.AccessData
-	if prevAccessDataToken != "" {
-		prevAccessData, _, _, _, err = s.loadAccess(prevAccessDataToken)
-		if err != nil {
-			return nil, err
-		}
-	}
+	log.Printf("Loading refresh token: %s\n", token)
+	accessData, _, _, clientID, err := s.loadAccess(token, true)
+
+	//load previous access data if token is not empty (NOT WORKING: the previous token seems to be deleted when a refresh token is generated in the new API)
+	// var prevAccessData *osin.AccessData
+	// if prevAccessDataToken != "" {
+	// 	prevAccessData, _, _, _, err = s.loadAccess(prevAccessDataToken)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// }
+
 	//load client data
 	client, err := s.GetClient(clientID)
 	if err != nil {
 		return nil, err
 	}
 	//load authorize data
-	authData, err := s.LoadAuthorize(authDataCode)
+	//authData, err := s.LoadAuthorize(authDataCode)
 
 	accessData.Client = client
-	accessData.AuthorizeData = authData
-	accessData.AccessData = prevAccessData
+	//accessData.AuthorizeData = authData
+	//accessData.AccessData = prevAccessData
 	return accessData, err
 }
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"github.com/pborman/uuid"
 	"github.com/shopspring/decimal"
 	"log"
@@ -71,13 +72,20 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 	return salesOrders, nil
 }
 
-func (s *SalesOrderRepository) ApproveSalesOrder(salesOrderId string, generateDeliveryRequest bool, userId string) error {
-	stmt, err := s.db.Prepare("exec Mobile_ApproveSalesOrder @SalesOrderID = ?, @GenerateDeliveryRequest = ?, @UserID = ?;")
+func (s *SalesOrderRepository) ApproveSalesOrder(salesOrderId string, generateDeliveryRequest bool, userId string) (string, error) {
+	var (
+		result           string
+		errorDescription string
+	)
+	row := s.db.QueryRow("exec Mobile_ApproveSalesOrder @SalesOrderID = ?, @GenerateDeliveryRequest = ?, @UserID = ?;", salesOrderId, generateDeliveryRequest, userId)
+	err := row.Scan(&result, &errorDescription)
 	if err != nil {
-		return err
+		return "", err
 	}
-	_, err = stmt.Exec(salesOrderId, generateDeliveryRequest, userId)
-	return err
+	if errorDescription != "" {
+		return "result", errors.New(errorDescription)
+	}
+	return result, err
 }
 
 type SalesOrder struct {

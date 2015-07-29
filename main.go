@@ -90,13 +90,13 @@ func handlePendingSalesOrders(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%s\n", err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json; encoding=utf8")
 	b, err := json.Marshal(salesOrders)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		log.Printf("%s\n", err)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json; encoding=utf8")
 	w.Write(b)
 }
 
@@ -108,8 +108,11 @@ func handleApproveSalesOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r.ParseForm()
-	salesOrderId := r.Form.Get("salesOrderId")
+	vars := mux.Vars(r)
+	salesOrderId := vars["salesOrderId"]
+	log.Printf("salesOrderId: %s", salesOrderId)
 	generateDeliveryRequest := r.Form.Get("generateDeliveryRequest")
+
 	if salesOrderId == "" {
 		http.Error(w, "salesOrderId is not specified", http.StatusBadRequest)
 		return
@@ -130,12 +133,26 @@ func handleApproveSalesOrder(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "You do not have permission to approve sales orders", http.StatusUnauthorized)
 		return
 	}
-	err = salesOrderRepo.ApproveSalesOrder(salesOrderId, generateDeliveryRequestBool, user.UserId.String())
+	result, err := salesOrderRepo.ApproveSalesOrder(salesOrderId, generateDeliveryRequestBool, user.UserId.String())
+	log.Printf("Result: %s\n", result)
 	if err != nil {
 		http.Error(w, "Could not approve sales order", http.StatusInternalServerError)
 		log.Printf("ERROR: %s\n", err)
 		return
 	}
+	output := struct {
+		Result string `json:"result"`
+	}{
+		Result: result,
+	}
+	b, err := json.Marshal(output)
+	if err != nil {
+		http.Error(w, "Could not parse json result output", http.StatusInternalServerError)
+		log.Printf("ERROR: %s\n", err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; encoding=utf8")
+	w.Write(b)
 }
 
 const lenStatic = len("/static/")

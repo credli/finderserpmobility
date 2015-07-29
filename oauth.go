@@ -101,6 +101,7 @@ func (o *OAuthHandler) GenerateToken(w http.ResponseWriter, r *http.Request) {
 		case osin.CLIENT_CREDENTIALS:
 			ar.Authorized = true
 		}
+
 		server.FinishAccessRequest(resp, r, ar)
 	}
 	if resp.IsError && resp.InternalError != nil {
