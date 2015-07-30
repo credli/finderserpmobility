@@ -41,7 +41,7 @@ func (o *OAuthHandler) AuthorizeClient(w http.ResponseWriter, r *http.Request) {
 	defer resp.Close()
 
 	if ar := server.HandleAuthorizeRequest(resp, r); ar != nil {
-		if !o.HandleLoginPage(ar, w, r) {
+		if !o.handleLoginPage(ar, w, r) {
 			return
 		}
 		ar.Authorized = true
@@ -53,7 +53,7 @@ func (o *OAuthHandler) AuthorizeClient(w http.ResponseWriter, r *http.Request) {
 	osin.OutputJSON(resp, w, r)
 }
 
-func (o *OAuthHandler) HandleLoginPage(ar *osin.AuthorizeRequest, w http.ResponseWriter, r *http.Request) bool {
+func (o *OAuthHandler) handleLoginPage(ar *osin.AuthorizeRequest, w http.ResponseWriter, r *http.Request) bool {
 	r.ParseForm()
 	username := ""
 	password := ""
