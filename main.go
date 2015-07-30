@@ -104,50 +104,53 @@ func handleApproveSalesOrder(w http.ResponseWriter, r *http.Request) {
 	data := context.Get(r, USERDATA)
 	user, ok := data.(*User)
 	if ok == false {
-		http.Error(w, "Context data is invalid", http.StatusInternalServerError)
+		http.Error(w, deferror.Get(E_INVALID_CONTEXT), http.StatusInternalServerError)
 		return
 	}
 	r.ParseForm()
 	vars := mux.Vars(r)
 	salesOrderId := vars["salesOrderId"]
-	log.Printf("salesOrderId: %s", salesOrderId)
 	generateDeliveryRequest := r.Form.Get("generateDeliveryRequest")
 
 	if salesOrderId == "" {
-		http.Error(w, "salesOrderId is not specified", http.StatusBadRequest)
+		http.Error(w, deferror.Get(E_MISSING_VALUE, "salesOrderId"), http.StatusBadRequest)
 		return
 	}
 	generateDeliveryRequestBool, err := strconv.ParseBool(generateDeliveryRequest)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("could not recognize %s as boolean value in generateDeliveryRequest", generateDeliveryRequest), http.StatusBadRequest)
+		http.Error(w, deferror.Get(E_UNRECOGNIZED_VALUE, generateDeliveryRequest, "generateDeliveryRequest"), http.StatusBadRequest)
 		log.Printf("ERROR: %s\n", err)
 		return
 	}
 	privileged, err := userRepo.UserHasAdminPrivileges(user.UserId)
 	if err != nil {
-		http.Error(w, "Could not determine user privileges", http.StatusUnauthorized)
+		http.Error(w, deferror.Get(E_INVALID_PRIVILEGES), http.StatusUnauthorized)
 		log.Printf("ERROR: %s\n", err)
 		return
 	}
 	if privileged == false {
-		http.Error(w, "You do not have permission to approve sales orders", http.StatusUnauthorized)
+		http.Error(w, deferror.Get(E_NO_PERMISSION), http.StatusUnauthorized)
 		return
 	}
-	result, err := salesOrderRepo.ApproveSalesOrder(salesOrderId, generateDeliveryRequestBool, user.UserId.String())
-	log.Printf("Result: %s\n", result)
+	result, desc, err := salesOrderRepo.ApproveSalesOrder(salesOrderId, generateDeliveryRequestBool, user.UserId.String())
 	if err != nil {
-		http.Error(w, "Could not approve sales order", http.StatusInternalServerError)
+		http.Error(w, deferror.Get(E_UNKOWN_ERROR), http.StatusInternalServerError)
 		log.Printf("ERROR: %s\n", err)
 		return
 	}
+	if result == "ERROR" {
+		w.WriteHeader(http.StatusNotAcceptable)
+	}
 	output := struct {
-		Result string `json:"result"`
+		Result      string `json:"result"`
+		Description string `json:"description"`
 	}{
-		Result: result,
+		Result:      result,
+		Description: desc,
 	}
 	b, err := json.Marshal(output)
 	if err != nil {
-		http.Error(w, "Could not parse json result output", http.StatusInternalServerError)
+		http.Error(w, deferror.Get(E_PARSER_ERROR), http.StatusInternalServerError)
 		log.Printf("ERROR: %s\n", err)
 		return
 	}
@@ -165,7 +168,7 @@ func handleStatic(w http.ResponseWriter, r *http.Request) {
 func serveFileStatic(w http.ResponseWriter, r *http.Request, filename string) {
 	filePath := filepath.Join("static", filename)
 	if !pathExists(filePath) {
-		http.Error(w, fmt.Sprintf("File %s does not exist", filePath), http.StatusNotFound)
+		http.Error(w, deferror.Get(E_FILE_NOT_EXISTS, filePath), http.StatusNotFound)
 		return
 	}
 	http.ServeFile(w, r, filePath)

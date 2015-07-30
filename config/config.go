@@ -2,6 +2,7 @@ package config
 
 import (
 	"flag"
+	"os"
 )
 
 type Config struct {
@@ -11,10 +12,13 @@ type Config struct {
 }
 
 func NewConfig() *Config {
+	drivername := os.Getenv("FINDERSERP_MOBILITY_DRIVER_NAME")
+	connectionstring := os.Getenv("FINDERSERP_MOBILITY_CONNECTIONSTRING")
+	hostaddr := os.Getenv("FINDERSERP_MOBILITY_HOST_ADDRESS")
+
 	return &Config{
-		DbDriverName:       *flag.String("DbDriverName", "mssql", "SQL driver name"),
-		DbConnectionString: *flag.String("DbConnectionString", "server=j7dpgj7zuc.database.secure.windows.net;user id=finderserp@j7dpgj7zuc;password=Pl@c10!@#;database=FindersERPDB", "Database connection string, example: \"server=ServerName;user id=username;password=p@ssw0rd;database=DatabaseName\""),
-		//DbConnectionString: *flag.String("DbConnectionString", "server=nick-pc;user id=sa;password=MyInternet!@#;database=FindersERPDB;", "test"),
-		HostAddr: *flag.String("HostAddr", ":5001", "Host and port to listen on."),
+		DbDriverName:       *flag.String("DbDriverName", drivername, "SQL driver name"),
+		DbConnectionString: *flag.String("DbConnectionString", connectionstring, "Database connection string, example: \"server=ServerName;user id=username;password=p@ssw0rd;database=DatabaseName\""),
+		HostAddr:           *flag.String("HostAddr", hostaddr, "Host and port to listen on."),
 	}
 }

@@ -22,14 +22,14 @@ func (o *OAuthHandler) MiddlewareFunc(handler http.HandlerFunc) http.HandlerFunc
 
 		token, err := o.extractToken(authHeader)
 		if err != nil {
-			http.Error(w, "Missing authentication", http.StatusBadRequest)
+			http.Error(w, deferror.Get(E_MISSING_AUTHENTICATION), http.StatusBadRequest)
 			return
 		}
 
 		accessData, err := o.server.Storage.LoadAccess(token)
 		if err != nil {
 			log.Printf("Error: %s\n", err)
-			http.Error(w, "Invalid authentication", http.StatusBadRequest)
+			http.Error(w, deferror.Get(E_INVALID_AUTHENTICATION), http.StatusBadRequest)
 			return
 		}
 
@@ -57,11 +57,11 @@ func (o *OAuthHandler) MiddlewareFunc(handler http.HandlerFunc) http.HandlerFunc
 func (o *OAuthHandler) extractToken(header string) (string, error) {
 	parts := strings.SplitN(header, " ", 2)
 	if !(len(parts) == 2 && parts[0] == "Bearer") {
-		return "", errors.New("Invalid authentication")
+		return "", errors.New(deferror.Get(E_INVALID_AUTHENTICATION))
 	}
 	return parts[1], nil
 }
 
 func (o *OAuthHandler) unauthorized(w http.ResponseWriter) {
-	http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	http.Error(w, deferror.Get(E_UNAUTHORIZED), http.StatusUnauthorized)
 }

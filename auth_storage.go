@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/RangelReale/osin"
 	"github.com/pborman/uuid"
-	"log"
 	"time"
 )
 
@@ -65,7 +64,6 @@ func (s *AuthStorage) RemoveClient(id string) error {
 }
 
 func (s *AuthStorage) SaveAuthorize(auth *osin.AuthorizeData) error {
-	log.Printf("UserData: %s\n", auth.UserData)
 	user := auth.UserData.(*User)
 
 	stmt, err := s.db.Prepare(`
@@ -102,12 +100,14 @@ func (s *AuthStorage) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 		return nil, err
 	}
 
-	uid := toLittleEndian(userID)
+	uid, err := toLittleEndian(userID)
+	if err != nil {
+		return nil, err
+	}
 	user, err := userRepo.GetUser(uid)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Yo! user: %s\n%s\n%s\n", user.UserName)
 
 	authData := &osin.AuthorizeData{
 		Code:        authCode,
@@ -133,9 +133,7 @@ func (s *AuthStorage) RemoveAuthorize(code string) error {
 }
 
 func (s *AuthStorage) SaveAccess(access *osin.AccessData) error {
-	log.Printf("UserData: %s\n", access.UserData)
 	user := access.UserData.(*User)
-	log.Printf("user at this point is %s", user)
 	stmt, err := s.db.Prepare(`
 		INSERT INTO access_data(access_token, refresh_token, expires_in,
 			scope, redirect_uri, created_at, authorize_data_code, prev_access_data_token, client_id, user_id)
@@ -200,14 +198,15 @@ func (s *AuthStorage) loadAccess(token string, isRefresh ...bool) (*osin.AccessD
 		return nil, "", "", "", errors.New(fmt.Sprintf("%s %s was not scanned", whichToken, token))
 	}
 
-	log.Printf("userID: %s\n", userID)
-	uid := toLittleEndian(userID)
+	uid, err := toLittleEndian(userID)
+	if err != nil {
+		return nil, "", "", "", err
+	}
 	user, err := userRepo.GetUser(uid)
 	if err != nil {
 		return nil, "", "", "", err
 	}
 
-	log.Println("returning function with err: %s", err)
 	return &osin.AccessData{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
@@ -224,7 +223,7 @@ func (s *AuthStorage) LoadAccess(token string) (*osin.AccessData, error) {
 	if err != nil {
 		return nil, err
 	}
-	//load previous access data if the token is not empty
+	//load previous access data if the token is not empty, cannot find it since generating a new token in osin will now clean up the old one meaning that there is no prevAccessData in the datastore
 	// var prevAccessData *osin.AccessData
 	// if prevAccessDataToken != "" {
 	// 	prevAccessData, _, _, _, err = s.loadAccess(prevAccessDataToken)
@@ -257,7 +256,6 @@ func (s *AuthStorage) RemoveAccess(token string) error {
 }
 
 func (s *AuthStorage) LoadRefresh(token string) (*osin.AccessData, error) {
-	log.Printf("Loading refresh token: %s\n", token)
 	accessData, _, _, clientID, err := s.loadAccess(token, true)
 
 	//load previous access data if token is not empty (NOT WORKING: the previous token seems to be deleted when a refresh token is generated in the new API)

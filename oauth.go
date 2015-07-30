@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"github.com/RangelReale/osin"
 	"log"
-	//"github.com/gorilla/context"
 	"net/http"
 	"net/url"
 )
@@ -91,7 +90,6 @@ func (o *OAuthHandler) GenerateToken(w http.ResponseWriter, r *http.Request) {
 	resp := server.NewResponse()
 	defer resp.Close()
 	if ar := server.HandleAccessRequest(resp, r); ar != nil {
-		log.Printf("ar.UserData at this point is: %s\n", ar.UserData)
 
 		switch ar.Type {
 		case osin.AUTHORIZATION_CODE:

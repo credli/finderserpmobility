@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"errors"
 	"github.com/pborman/uuid"
 	"github.com/shopspring/decimal"
 	"log"
@@ -40,7 +39,10 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 			customerName string
 		)
 		rows.Scan(&id, &seqNumber, &addedBy, &addedDate, &customerName)
-		salesOrder := NewSalesOrder(id, seqNumber, addedBy, addedDate, customerName)
+		salesOrder, err := NewSalesOrder(id, seqNumber, addedBy, addedDate, customerName)
+		if err != nil {
+			return nil, err
+		}
 
 		if includeItems == true {
 			rows2, err := s.db.Query("exec Mobile_GetSalesOrderItems @SalesOrderID = ?;", salesOrder.ID.String())
@@ -61,7 +63,10 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 					deliveryDeadline   time.Time
 				)
 				rows2.Scan(&soId, &salesoid, &productName, &pricePerKg, &discountPercentage, &unitName, &qtyInKg, &deliveryDeadline)
-				salesOrderItem := NewSalesOrderItem(soId, productName, pricePerKg, discountPercentage, unitName, qtyInKg, deliveryDeadline)
+				salesOrderItem, err := NewSalesOrderItem(soId, productName, pricePerKg, discountPercentage, unitName, qtyInKg, deliveryDeadline)
+				if err != nil {
+					return nil, err
+				}
 				salesOrder.AddItem(salesOrderItem)
 			}
 		}
@@ -72,20 +77,20 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 	return salesOrders, nil
 }
 
-func (s *SalesOrderRepository) ApproveSalesOrder(salesOrderId string, generateDeliveryRequest bool, userId string) (string, error) {
+func (s *SalesOrderRepository) ApproveSalesOrder(salesOrderId string, generateDeliveryRequest bool, userId string) (string, string, error) {
 	var (
-		result           string
-		errorDescription string
+		result      string
+		description string
 	)
 	row := s.db.QueryRow("exec Mobile_ApproveSalesOrder @SalesOrderID = ?, @GenerateDeliveryRequest = ?, @UserID = ?;", salesOrderId, generateDeliveryRequest, userId)
-	err := row.Scan(&result, &errorDescription)
+	err := row.Scan(&result, &description)
 	if err != nil {
-		return "", err
+		return "ERROR", err.Error(), err
 	}
-	if errorDescription != "" {
-		return "result", errors.New(errorDescription)
+	if description == "" && err != nil && result == "OK" {
+		description = "Sales order was successfully approved"
 	}
-	return result, err
+	return result, description, err
 }
 
 type SalesOrder struct {
@@ -98,8 +103,11 @@ type SalesOrder struct {
 	GrandTotal   decimal.Decimal   `json:"grandTotal"`
 }
 
-func NewSalesOrder(id uuid.UUID, seq int, addedBy string, addedDate time.Time, customerName string) *SalesOrder {
-	leid := toLittleEndian(id)
+func NewSalesOrder(id uuid.UUID, seq int, addedBy string, addedDate time.Time, customerName string) (*SalesOrder, error) {
+	leid, err := toLittleEndian(id)
+	if err != nil {
+		return nil, err
+	}
 	return &SalesOrder{
 		ID:           leid,
 		SeqNumber:    seq,
@@ -107,7 +115,7 @@ func NewSalesOrder(id uuid.UUID, seq int, addedBy string, addedDate time.Time, c
 		AddedDate:    addedDate,
 		CustomerName: customerName,
 		Items:        make([]*SalesOrderItem, 0),
-	}
+	}, nil
 }
 
 func (s *SalesOrder) AddItem(item *SalesOrderItem) {
@@ -136,8 +144,11 @@ type SalesOrderItem struct {
 	LineTotal        decimal.Decimal `json:"lineTotal"`
 }
 
-func NewSalesOrderItem(id uuid.UUID, productName string, price decimal.Decimal, discountPercent float64, unitName string, qty int, deliveryDeadline time.Time) *SalesOrderItem {
-	leid := toLittleEndian(id)
+func NewSalesOrderItem(id uuid.UUID, productName string, price decimal.Decimal, discountPercent float64, unitName string, qty int, deliveryDeadline time.Time) (*SalesOrderItem, error) {
+	leid, err := toLittleEndian(id)
+	if err != nil {
+		return nil, err
+	}
 	return &SalesOrderItem{
 		ID:               leid,
 		ProductName:      productName,
@@ -146,7 +157,7 @@ func NewSalesOrderItem(id uuid.UUID, productName string, price decimal.Decimal, 
 		UnitName:         unitName,
 		QtyInKG:          qty,
 		DeliveryDeadline: deliveryDeadline,
-	}
+	}, nil
 }
 
 func (s *SalesOrderItem) CalculateLineTotal() decimal.Decimal {
@@ -170,16 +181,22 @@ type User struct {
 	LoggedInAt time.Time `json:"loggedInAt"`
 }
 
-func NewUser(id uuid.UUID, username string, password string, partnerID uuid.UUID) *User {
-	leid := toLittleEndian(id)
-	lepartnerID := toLittleEndian(partnerID)
+func NewUser(id uuid.UUID, username string, password string, partnerID uuid.UUID) (*User, error) {
+	leid, err := toLittleEndian(id)
+	if err != nil {
+		return nil, err
+	}
+	lepartnerID, err := toLittleEndian(partnerID)
+	if err != nil {
+		return nil, err
+	}
 	return &User{
 		UserId:     leid,
 		UserName:   username,
 		Password:   password,
 		PartnerID:  lepartnerID,
 		LoggedInAt: time.Now(),
-	}
+	}, nil
 }
 
 type UserRepository struct {
@@ -200,7 +217,8 @@ func (u *UserRepository) GetUser(userId uuid.UUID) (*User, error) {
 		Password  string
 		PartnerID uuid.UUID
 	)
-	row := u.db.QueryRow(`SELECT a.UserId, a.UserName, b.Password, d.ID AS PartnerID FROM aspnet_Users AS a
+	row := u.db.QueryRow(`
+		SELECT a.UserId, a.UserName, b.Password, d.ID AS PartnerID FROM aspnet_Users AS a
 		INNER JOIN aspnet_Membership AS b ON a.UserId = b.UserId
 		INNER JOIN PartnerUsers AS c ON c.UserID = a.UserId
 		INNER JOIN Partners AS d ON d.ID = c.PartnerID
@@ -213,7 +231,11 @@ func (u *UserRepository) GetUser(userId uuid.UUID) (*User, error) {
 	if UserName == "" {
 		return nil, nil
 	}
-	return NewUser(UserId, UserName, Password, PartnerID), nil
+	newUser, err := NewUser(UserId, UserName, Password, PartnerID)
+	if err != nil {
+		return nil, err
+	}
+	return newUser, nil
 }
 
 func (u *UserRepository) Login(name string, pass string) (*User, error) {
@@ -223,7 +245,8 @@ func (u *UserRepository) Login(name string, pass string) (*User, error) {
 		Password  string
 		PartnerID uuid.UUID
 	)
-	row := u.db.QueryRow(`SELECT a.UserId, a.UserName, b.Password, d.ID AS PartnerID FROM aspnet_Users AS a
+	row := u.db.QueryRow(`
+		SELECT a.UserId, a.UserName, b.Password, d.ID AS PartnerID FROM aspnet_Users AS a
 		INNER JOIN aspnet_Membership AS b ON a.UserId = b.UserId
 		INNER JOIN PartnerUsers AS c ON c.UserID = a.UserId
 		INNER JOIN Partners AS d ON d.ID = c.PartnerID
@@ -235,12 +258,17 @@ func (u *UserRepository) Login(name string, pass string) (*User, error) {
 	if UserName == "" {
 		return nil, nil
 	}
-	return NewUser(UserId, UserName, Password, PartnerID), nil
+	newUser, err := NewUser(UserId, UserName, Password, PartnerID)
+	if err != nil {
+		return nil, err
+	}
+	return newUser, nil
 }
 
 func (u *UserRepository) UserHasAdminPrivileges(userId uuid.UUID) (bool, error) {
 	var ()
-	rows, err := u.db.Query(`SELECT c.RoleName FROM aspnet_Users AS a
+	rows, err := u.db.Query(`
+		SELECT c.RoleName FROM aspnet_Users AS a
 		INNER JOIN aspnet_UsersInRoles AS b ON a.UserId = b.UserId
 		INNER JOIN aspnet_Roles AS c ON c.RoleId = b.RoleId
 		WHERE a.UserId = ? AND c.RoleName = ? OR c.RoleName = ? OR c.RoleName = ?`, userId.String(), "Administrators", "SalesManager", "MarketingManager")
