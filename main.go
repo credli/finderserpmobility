@@ -25,6 +25,7 @@ var (
 )
 
 func main() {
+	_ = "breakpoint"
 	db, err := sql.Open(config.DbDriverName, config.DbConnectionString)
 	if err != nil {
 		log.Panicln(err)
@@ -34,7 +35,6 @@ func main() {
 		log.Panicln(err)
 	}
 	defer db.Close()
-
 	//repositories
 	salesOrderRepo = NewSalesOrderRepository(db)
 	userRepo = NewUserRepository(db)
@@ -61,6 +61,7 @@ func main() {
 	mainRouter.HandleFunc("/", handleIndex).Methods("GET")
 	mainRouter.HandleFunc("/sales/pending/{partnerId}", oAuth.MiddlewareFunc(handlePendingSalesOrders)).Methods("GET")
 	mainRouter.HandleFunc("/sales/approve/{salesOrderId}", oAuth.MiddlewareFunc(handleApproveSalesOrder)).Methods("POST")
+	mainRouter.HandleFunc("/sales/reject/{salesOrderId}", oAuth.MiddlewareFunc(handleRejectSalesOrder)).Methods("POST")
 	//static routes
 	http.HandleFunc("/static/", handleStatic)
 	http.Handle("/", mainRouter)
@@ -133,6 +134,44 @@ func handleApproveSalesOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result, desc, err := salesOrderRepo.ApproveSalesOrder(salesOrderId, generateDeliveryRequestBool, user.UserId.String())
+	writeResult(w, result, desc, err)
+}
+
+func handleRejectSalesOrder(w http.ResponseWriter, r *http.Request) {
+	data := context.Get(r, USERDATA)
+	user, ok := data.(*User)
+	if ok == false {
+		http.Error(w, deferror.Get(E_INVALID_CONTEXT), http.StatusInternalServerError)
+		return
+	}
+	r.ParseForm()
+	vars := mux.Vars(r)
+	salesOrderId := vars["salesOrderId"]
+	reason := r.Form.Get("reason")
+
+	if salesOrderId == "" {
+		http.Error(w, deferror.Get(E_MISSING_VALUE, "salesOrderId"), http.StatusBadRequest)
+		return
+	}
+	if reason == "" {
+		http.Error(w, deferror.Get(E_MISSING_VALUE, "reason"), http.StatusBadRequest)
+		return
+	}
+	privileged, err := userRepo.UserHasAdminPrivileges(user.UserId)
+	if err != nil {
+		http.Error(w, deferror.Get(E_INVALID_PRIVILEGES), http.StatusUnauthorized)
+		log.Printf("ERROR: %s\n", err)
+		return
+	}
+	if privileged == false {
+		http.Error(w, deferror.Get(E_NO_PERMISSION), http.StatusUnauthorized)
+		return
+	}
+	result, desc, err := salesOrderRepo.RejectSalesOrder(salesOrderId, reason, user.UserId.String())
+	writeResult(w, result, desc, err)
+}
+
+func writeResult(w http.ResponseWriter, result, description string, err error) {
 	if err != nil {
 		http.Error(w, deferror.Get(E_UNKOWN_ERROR), http.StatusInternalServerError)
 		log.Printf("ERROR: %s\n", err)
@@ -146,7 +185,7 @@ func handleApproveSalesOrder(w http.ResponseWriter, r *http.Request) {
 		Description string `json:"description"`
 	}{
 		Result:      result,
-		Description: desc,
+		Description: description,
 	}
 	b, err := json.Marshal(output)
 	if err != nil {

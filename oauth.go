@@ -27,9 +27,7 @@ type OAuthHandler struct {
 func NewOAuthHandler(db *sql.DB) *OAuthHandler {
 	config := osin.NewServerConfig()
 	config.AllowedAuthorizeTypes = osin.AllowedAuthorizeType{osin.CODE, osin.TOKEN}
-	config.AllowedAccessTypes = osin.AllowedAccessType{osin.AUTHORIZATION_CODE, osin.REFRESH_TOKEN,
-		osin.PASSWORD, osin.CLIENT_CREDENTIALS, osin.ASSERTION}
-	config.AllowGetAccessRequest = true
+	config.AllowedAccessTypes = osin.AllowedAccessType{osin.AUTHORIZATION_CODE, osin.REFRESH_TOKEN}
 	storage := NewAuthStorage(db)
 	server := osin.NewServer(config, storage)
 	return &OAuthHandler{config, server, storage, db}
@@ -90,7 +88,6 @@ func (o *OAuthHandler) GenerateToken(w http.ResponseWriter, r *http.Request) {
 	resp := server.NewResponse()
 	defer resp.Close()
 	if ar := server.HandleAccessRequest(resp, r); ar != nil {
-
 		switch ar.Type {
 		case osin.AUTHORIZATION_CODE:
 			ar.Authorized = true
@@ -99,7 +96,6 @@ func (o *OAuthHandler) GenerateToken(w http.ResponseWriter, r *http.Request) {
 		case osin.CLIENT_CREDENTIALS:
 			ar.Authorized = true
 		}
-
 		server.FinishAccessRequest(resp, r, ar)
 	}
 	if resp.IsError && resp.InternalError != nil {

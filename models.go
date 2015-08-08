@@ -93,6 +93,22 @@ func (s *SalesOrderRepository) ApproveSalesOrder(salesOrderId string, generateDe
 	return result, description, err
 }
 
+func (s *SalesOrderRepository) RejectSalesOrder(salesOrderId string, reason string, userId string) (string, string, error) {
+	var (
+		result      string
+		description string
+	)
+	row := s.db.QueryRow("exec Mobile_RejectSalesOrder @SalesOrderID = ?, @Reason = ?, @UserID = ?;", salesOrderId, reason, userId)
+	err := row.Scan(&result, &description)
+	if err != nil {
+		return "ERROR", err.Error(), err
+	}
+	if description == "" && err != nil && result == "OK" {
+		description = "Sales order was rejected"
+	}
+	return result, description, err
+}
+
 type SalesOrder struct {
 	ID           uuid.UUID         `json:"id"`
 	SeqNumber    int               `json:"seqNumber"`
