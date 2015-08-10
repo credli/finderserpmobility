@@ -47,7 +47,7 @@ func (o *OAuthHandler) AuthorizeClient(w http.ResponseWriter, r *http.Request) {
 	}
 	if resp.IsError && resp.InternalError != nil {
 		//log.Printf("ERROR: %s\n", resp.InternalError)
-		w.WriteHeader(http.StatusBadRequest)
+		resp.StatusCode = http.StatusBadRequest
 	}
 	osin.OutputJSON(resp, w, r)
 }
@@ -101,7 +101,7 @@ func (o *OAuthHandler) GenerateToken(w http.ResponseWriter, r *http.Request) {
 	}
 	if resp.IsError && resp.InternalError != nil {
 		//log.Printf("ERROR: %s\n", resp.InternalError)
-		w.WriteHeader(http.StatusBadRequest)
+		resp.StatusCode = http.StatusBadRequest
 	}
 	osin.OutputJSON(resp, w, r)
 }
@@ -115,7 +115,7 @@ func (o *OAuthHandler) HandleInfo(w http.ResponseWriter, r *http.Request) {
 	}
 	if resp.IsError && resp.InternalError != nil {
 		//log.Printf("ERROR: %s\n", resp.InternalError) //unnecessary to report on bad token
-		w.WriteHeader(http.StatusBadRequest)
+		resp.StatusCode = http.StatusBadRequest
 	}
 	osin.OutputJSON(resp, w, r)
 }
