@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	"github.com/RangelReale/osin"
-	"log"
+	//"log"
 	"net/http"
 	"net/url"
 )
@@ -46,7 +46,8 @@ func (o *OAuthHandler) AuthorizeClient(w http.ResponseWriter, r *http.Request) {
 		server.FinishAuthorizeRequest(resp, r, ar)
 	}
 	if resp.IsError && resp.InternalError != nil {
-		log.Printf("ERROR: %s\n", resp.InternalError)
+		//log.Printf("ERROR: %s\n", resp.InternalError)
+		w.WriteHeader(http.StatusBadRequest)
 	}
 	osin.OutputJSON(resp, w, r)
 }
@@ -99,7 +100,8 @@ func (o *OAuthHandler) GenerateToken(w http.ResponseWriter, r *http.Request) {
 		server.FinishAccessRequest(resp, r, ar)
 	}
 	if resp.IsError && resp.InternalError != nil {
-		log.Printf("ERROR: %s\n", resp.InternalError)
+		//log.Printf("ERROR: %s\n", resp.InternalError)
+		w.WriteHeader(http.StatusBadRequest)
 	}
 	osin.OutputJSON(resp, w, r)
 }
@@ -110,6 +112,10 @@ func (o *OAuthHandler) HandleInfo(w http.ResponseWriter, r *http.Request) {
 	defer resp.Close()
 	if ir := server.HandleInfoRequest(resp, r); ir != nil {
 		server.FinishInfoRequest(resp, r, ir)
+	}
+	if resp.IsError && resp.InternalError != nil {
+		//log.Printf("ERROR: %s\n", resp.InternalError) //unnecessary to report on bad token
+		w.WriteHeader(http.StatusBadRequest)
 	}
 	osin.OutputJSON(resp, w, r)
 }

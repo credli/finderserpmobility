@@ -27,6 +27,7 @@ var (
 func main() {
 	_ = "breakpoint"
 	db, err := sql.Open(config.DbDriverName, config.DbConnectionString)
+	//db.SetMaxIdleConns(0)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -97,7 +98,7 @@ func handlePendingSalesOrders(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%s\n", err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json; encoding=utf8")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Write(b)
 }
 
@@ -193,7 +194,7 @@ func writeResult(w http.ResponseWriter, result, description string, err error) {
 		log.Printf("ERROR: %s\n", err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json; encoding=utf8")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Write(b)
 }
 
