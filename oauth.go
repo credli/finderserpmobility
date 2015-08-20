@@ -85,6 +85,7 @@ func renderLoginPage(w http.ResponseWriter, page *LoginPage) {
 }
 
 func (o *OAuthHandler) GenerateToken(w http.ResponseWriter, r *http.Request) {
+	_ = "breakpoint"
 	server := o.server
 	resp := server.NewResponse()
 	defer resp.Close()

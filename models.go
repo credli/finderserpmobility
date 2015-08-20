@@ -195,9 +195,10 @@ type User struct {
 	Password   string    `json:"-"`
 	PartnerID  uuid.UUID `json:"partnerId"`
 	LoggedInAt time.Time `json:"loggedInAt"`
+	Email      string    `json:"email"`
 }
 
-func NewUser(id uuid.UUID, username string, password string, partnerID uuid.UUID) (*User, error) {
+func NewUser(id uuid.UUID, username string, password string, partnerID uuid.UUID, email string) (*User, error) {
 	leid, err := toLittleEndian(id)
 	if err != nil {
 		return nil, err
@@ -212,6 +213,7 @@ func NewUser(id uuid.UUID, username string, password string, partnerID uuid.UUID
 		Password:   password,
 		PartnerID:  lepartnerID,
 		LoggedInAt: time.Now(),
+		Email:      email,
 	}, nil
 }
 
@@ -232,14 +234,15 @@ func (u *UserRepository) GetUser(userId uuid.UUID) (*User, error) {
 		UserName  string
 		Password  string
 		PartnerID uuid.UUID
+		Email     string
 	)
 	row := u.db.QueryRow(`
-		SELECT a.UserId, a.UserName, b.Password, d.ID AS PartnerID FROM aspnet_Users AS a
+		SELECT a.UserId, a.UserName, b.Password, d.ID AS PartnerID, b.LoweredEmail as Email FROM aspnet_Users AS a
 		INNER JOIN aspnet_Membership AS b ON a.UserId = b.UserId
 		INNER JOIN PartnerUsers AS c ON c.UserID = a.UserId
 		INNER JOIN Partners AS d ON d.ID = c.PartnerID
 		WHERE a.UserId = ?`, userId.String())
-	err := row.Scan(&UserId, &UserName, &Password, &PartnerID)
+	err := row.Scan(&UserId, &UserName, &Password, &PartnerID, &Email)
 	if err != nil {
 		log.Printf("Error in GetUser: %s", err)
 		return nil, err
@@ -247,7 +250,7 @@ func (u *UserRepository) GetUser(userId uuid.UUID) (*User, error) {
 	if UserName == "" {
 		return nil, nil
 	}
-	newUser, err := NewUser(UserId, UserName, Password, PartnerID)
+	newUser, err := NewUser(UserId, UserName, Password, PartnerID, Email)
 	if err != nil {
 		return nil, err
 	}
@@ -260,21 +263,22 @@ func (u *UserRepository) Login(name string, pass string) (*User, error) {
 		UserName  string
 		Password  string
 		PartnerID uuid.UUID
+		Email     string
 	)
 	row := u.db.QueryRow(`
-		SELECT a.UserId, a.UserName, b.Password, d.ID AS PartnerID FROM aspnet_Users AS a
+		SELECT a.UserId, a.UserName, b.Password, d.ID AS PartnerID, b.LoweredEmail as Email FROM aspnet_Users AS a
 		INNER JOIN aspnet_Membership AS b ON a.UserId = b.UserId
 		INNER JOIN PartnerUsers AS c ON c.UserID = a.UserId
 		INNER JOIN Partners AS d ON d.ID = c.PartnerID
 		WHERE a.UserName = ? AND b.Password = ?`, name, pass)
-	err := row.Scan(&UserId, &UserName, &Password, &PartnerID)
+	err := row.Scan(&UserId, &UserName, &Password, &PartnerID, &Email)
 	if err != nil {
 		return nil, err
 	}
 	if UserName == "" {
 		return nil, nil
 	}
-	newUser, err := NewUser(UserId, UserName, Password, PartnerID)
+	newUser, err := NewUser(UserId, UserName, Password, PartnerID, Email)
 	if err != nil {
 		return nil, err
 	}

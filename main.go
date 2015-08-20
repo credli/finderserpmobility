@@ -25,7 +25,6 @@ var (
 )
 
 func main() {
-	_ = "breakpoint"
 	db, err := sql.Open(config.DbDriverName, config.DbConnectionString)
 	//db.SetMaxIdleConns(0)
 	if err != nil {
@@ -41,11 +40,11 @@ func main() {
 	userRepo = NewUserRepository(db)
 	oAuth := NewOAuthHandler(db)
 
-	if _, err := oAuth.Storage.GetClient("finderserpmobility"); err != nil {
+	if _, err := oAuth.Storage.GetClient("finderserpmobilityapp"); err != nil {
 		if err = oAuth.Storage.SetClient(&osin.DefaultClient{
-			Id:          "finderserpmobility",
-			Secret:      "smellycat",
-			RedirectUri: "http://localhost:5001/",
+			Id:          "finderserpmobilityapp",
+			Secret:      "spookyturtle",
+			RedirectUri: "finderserpmobility://",
 		}); err != nil {
 			panic(err)
 		}
@@ -60,6 +59,7 @@ func main() {
 	oauthSub.HandleFunc("/info", oAuth.HandleInfo)
 	//API routes
 	mainRouter.HandleFunc("/", handleIndex).Methods("GET")
+	mainRouter.HandleFunc("/me", oAuth.MiddlewareFunc(handleMe)).Methods("GET")
 	mainRouter.HandleFunc("/sales/pending/{partnerId}", oAuth.MiddlewareFunc(handlePendingSalesOrders)).Methods("GET")
 	mainRouter.HandleFunc("/sales/approve/{salesOrderId}", oAuth.MiddlewareFunc(handleApproveSalesOrder)).Methods("POST")
 	mainRouter.HandleFunc("/sales/reject/{salesOrderId}", oAuth.MiddlewareFunc(handleRejectSalesOrder)).Methods("POST")
@@ -74,6 +74,29 @@ func main() {
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "index.html", nil)
+}
+
+func handleMe(w http.ResponseWriter, r *http.Request) {
+	data := context.Get(r, USERDATA)
+	user, ok := data.(*User)
+	if ok == false {
+		http.Error(w, deferror.Get(E_INVALID_CONTEXT), http.StatusInternalServerError)
+		return
+	}
+	userInfo, err := userRepo.GetUser(user.UserId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("%s\n", err)
+		return
+	}
+	b, err := json.Marshal(userInfo)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("%s\n", err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(b)
 }
 
 func handlePendingSalesOrders(w http.ResponseWriter, r *http.Request) {
