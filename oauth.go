@@ -46,7 +46,7 @@ func (o *OAuthHandler) AuthorizeClient(w http.ResponseWriter, r *http.Request) {
 		ar.Authorized = true
 		server.FinishAuthorizeRequest(resp, r, ar)
 	}
-	if resp.IsError && resp.InternalError != nil {
+	if resp.IsError || resp.InternalError != nil {
 		//log.Printf("ERROR: %s\n", resp.InternalError)
 		resp.StatusCode = http.StatusBadRequest
 	}
@@ -102,7 +102,7 @@ func (o *OAuthHandler) GenerateToken(w http.ResponseWriter, r *http.Request) {
 		}
 		server.FinishAccessRequest(resp, r, ar)
 	}
-	if resp.IsError && resp.InternalError != nil {
+	if resp.IsError || resp.InternalError != nil {
 		//log.Printf("ERROR: %s\n", resp.InternalError)
 		resp.StatusCode = http.StatusBadRequest
 	}
@@ -110,13 +110,14 @@ func (o *OAuthHandler) GenerateToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *OAuthHandler) HandleInfo(w http.ResponseWriter, r *http.Request) {
+	_ = "breakpoint"
 	server := o.server
 	resp := server.NewResponse()
 	defer resp.Close()
 	if ir := server.HandleInfoRequest(resp, r); ir != nil {
 		server.FinishInfoRequest(resp, r, ir)
 	}
-	if resp.IsError && resp.InternalError != nil {
+	if resp.IsError || resp.InternalError != nil {
 		//log.Printf("ERROR: %s\n", resp.InternalError) //unnecessary to report on bad token
 		resp.StatusCode = http.StatusBadRequest
 	}
