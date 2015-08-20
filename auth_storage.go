@@ -72,7 +72,8 @@ func (s *AuthStorage) SaveAuthorize(auth *osin.AuthorizeData) error {
 		return err
 	}
 
-	_, err = stmt.Exec(auth.Code, auth.ExpiresIn, auth.Scope, auth.RedirectUri, auth.State, auth.CreatedAt, auth.Client.GetId(), user.UserId)
+	_, err = stmt.Exec(auth.Code, auth.ExpiresIn, auth.Scope, auth.RedirectUri, auth.State, auth.CreatedAt.Round(time.Second), auth.Client.GetId(), user.UserId)
+	_ = "breakpoint"
 	return err
 }
 
