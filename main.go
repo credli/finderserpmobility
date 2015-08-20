@@ -7,7 +7,6 @@ import (
 	"github.com/RangelReale/osin"
 	_ "github.com/alexbrainman/odbc"
 	c "github.com/credli/finderserpmobility/config"
-	_ "github.com/denisenkom/go-mssqldb"
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
 	"html/template"
