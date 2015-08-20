@@ -149,7 +149,7 @@ func (s *AuthStorage) SaveAccess(access *osin.AccessData) error {
 	}
 
 	_, err = stmt.Exec(access.AccessToken, access.RefreshToken, access.ExpiresIn, access.Scope,
-		access.RedirectUri, access.CreatedAt, authDataCode, prevAccessDataToken, access.Client.GetId(), user.UserId)
+		access.RedirectUri, access.CreatedAt.Round(time.Second), authDataCode, prevAccessDataToken, access.Client.GetId(), user.UserId)
 	return err
 }
 
