@@ -2,16 +2,28 @@ package main
 
 import (
 	"database/sql"
+	"flag"
 	_ "github.com/alexbrainman/odbc"
 	"log"
+	"runtime"
 )
 
 var (
-	connStr = "server=j7dpgj7zuc.database.secure.windows.net;driver=FreeTDS;port=1433;uid=finderserp@j7dpgj7zuc;pwd=Pl@c10!@#;database=FindersERPDB"
+	connStr = flag.String("dsn", "", "ODBC DSN to override")
 )
 
+func getConnStr() string {
+	if connStr != nil && *connStr != "" {
+		return *connStr
+	}
+	if runtime.GOOS == "windows" {
+		return "DRIVER=SQL Server Native Client 11.0;Server=j7dpgj7zuc.database.secure.windows.net;uid=finderserp@j7dpgj7zuc;pwd=Pl@c10!@#;database=FindersERPDB;Encrypt=yes;TrustServerCertificate=no;"
+	}
+	return "server=j7dpgj7zuc.database.secure.windows.net;driver=FreeTDS;port=1433;uid=finderserp@j7dpgj7zuc;pwd=Pl@c10!@#;database=FindersERPDB"
+}
+
 func main() {
-	db, err := sql.Open("odbc", connStr)
+	db, err := sql.Open("odbc", getConnStr())
 	if err != nil {
 		reportError(err)
 		return
