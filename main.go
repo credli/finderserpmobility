@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/RangelReale/osin"
+	_ "github.com/alexbrainman/odbc"
 	c "github.com/credli/finderserpmobility/config"
 	_ "github.com/denisenkom/go-mssqldb"
 	"github.com/gorilla/context"
@@ -157,7 +158,7 @@ func handleApproveSalesOrder(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, deferror.Get(E_NO_PERMISSION), http.StatusUnauthorized)
 		return
 	}
-	result, desc, err := salesOrderRepo.ApproveSalesOrder(salesOrderId, generateDeliveryRequestBool, user.UserId.String())
+	result, desc, err := salesOrderRepo.ApproveSalesOrder(salesOrderId, generateDeliveryRequestBool, user.UserId)
 	writeResult(w, result, desc, err)
 }
 
@@ -191,7 +192,7 @@ func handleRejectSalesOrder(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, deferror.Get(E_NO_PERMISSION), http.StatusUnauthorized)
 		return
 	}
-	result, desc, err := salesOrderRepo.RejectSalesOrder(salesOrderId, reason, user.UserId.String())
+	result, desc, err := salesOrderRepo.RejectSalesOrder(salesOrderId, reason, user.UserId)
 	writeResult(w, result, desc, err)
 }
 

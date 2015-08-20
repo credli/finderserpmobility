@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"github.com/pborman/uuid"
 	"github.com/shopspring/decimal"
 	"log"
 	"time"
@@ -32,7 +31,7 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 
 	for rows.Next() {
 		var (
-			id           uuid.UUID
+			id           string
 			seqNumber    int
 			addedBy      string
 			addedDate    time.Time
@@ -45,7 +44,7 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 		}
 
 		if includeItems == true {
-			rows2, err := s.db.Query("exec Mobile_GetSalesOrderItems @SalesOrderID = ?;", salesOrder.ID.String())
+			rows2, err := s.db.Query("exec Mobile_GetSalesOrderItems @SalesOrderID = ?;", salesOrder.ID)
 			if err != nil {
 				return nil, err
 			}
@@ -53,8 +52,8 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 
 			for rows2.Next() {
 				var (
-					soId               uuid.UUID
-					salesoid           uuid.UUID
+					soId               string
+					salesoid           string
 					productName        string
 					pricePerKg         decimal.Decimal
 					discountPercentage float64
@@ -110,7 +109,7 @@ func (s *SalesOrderRepository) RejectSalesOrder(salesOrderId string, reason stri
 }
 
 type SalesOrder struct {
-	ID           uuid.UUID         `json:"id"`
+	ID           string            `json:"id"`
 	SeqNumber    int               `json:"seqNumber"`
 	AddedBy      string            `json:"addedBy"`
 	AddedDate    time.Time         `json:"addedDate"`
@@ -119,13 +118,13 @@ type SalesOrder struct {
 	GrandTotal   decimal.Decimal   `json:"grandTotal"`
 }
 
-func NewSalesOrder(id uuid.UUID, seq int, addedBy string, addedDate time.Time, customerName string) (*SalesOrder, error) {
-	leid, err := toLittleEndian(id)
-	if err != nil {
-		return nil, err
-	}
+func NewSalesOrder(id string, seq int, addedBy string, addedDate time.Time, customerName string) (*SalesOrder, error) {
+	// leid, err := toLittleEndian(id)
+	// if err != nil {
+	// 	return nil, err
+	// }
 	return &SalesOrder{
-		ID:           leid,
+		ID:           id,
 		SeqNumber:    seq,
 		AddedBy:      addedBy,
 		AddedDate:    addedDate,
@@ -150,7 +149,7 @@ func (s *SalesOrder) CalculateGrandTotal() decimal.Decimal {
 }
 
 type SalesOrderItem struct {
-	ID               uuid.UUID       `json:"id"`
+	ID               string          `json:"id"`
 	ProductName      string          `json:"productName"`
 	PricePerKG       decimal.Decimal `json:"pricePerKG"`
 	DiscountPercent  float64         `json:"discountPercent"`
@@ -160,13 +159,9 @@ type SalesOrderItem struct {
 	LineTotal        decimal.Decimal `json:"lineTotal"`
 }
 
-func NewSalesOrderItem(id uuid.UUID, productName string, price decimal.Decimal, discountPercent float64, unitName string, qty int, deliveryDeadline time.Time) (*SalesOrderItem, error) {
-	leid, err := toLittleEndian(id)
-	if err != nil {
-		return nil, err
-	}
+func NewSalesOrderItem(id string, productName string, price decimal.Decimal, discountPercent float64, unitName string, qty int, deliveryDeadline time.Time) (*SalesOrderItem, error) {
 	return &SalesOrderItem{
-		ID:               leid,
+		ID:               id,
 		ProductName:      productName,
 		PricePerKG:       price,
 		DiscountPercent:  discountPercent,
@@ -190,28 +185,20 @@ func (s *SalesOrderItem) CalculateLineTotal() decimal.Decimal {
 }
 
 type User struct {
-	UserId     uuid.UUID `json:"userId"`
+	UserId     string    `json:"userId"`
 	UserName   string    `json:"username"`
 	Password   string    `json:"-"`
-	PartnerID  uuid.UUID `json:"partnerId"`
+	PartnerID  string    `json:"partnerId"`
 	LoggedInAt time.Time `json:"loggedInAt"`
 	Email      string    `json:"email"`
 }
 
-func NewUser(id uuid.UUID, username string, password string, partnerID uuid.UUID, email string) (*User, error) {
-	leid, err := toLittleEndian(id)
-	if err != nil {
-		return nil, err
-	}
-	lepartnerID, err := toLittleEndian(partnerID)
-	if err != nil {
-		return nil, err
-	}
+func NewUser(id string, username string, password string, partnerID string, email string) (*User, error) {
 	return &User{
-		UserId:     leid,
+		UserId:     id,
 		UserName:   username,
 		Password:   password,
-		PartnerID:  lepartnerID,
+		PartnerID:  partnerID,
 		LoggedInAt: time.Now(),
 		Email:      email,
 	}, nil
@@ -228,12 +215,12 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	}
 }
 
-func (u *UserRepository) GetUser(userId uuid.UUID) (*User, error) {
+func (u *UserRepository) GetUser(userId string) (*User, error) {
 	var (
-		UserId    uuid.UUID
+		UserId    string
 		UserName  string
 		Password  string
-		PartnerID uuid.UUID
+		PartnerID string
 		Email     string
 	)
 	row := u.db.QueryRow(`
@@ -241,7 +228,7 @@ func (u *UserRepository) GetUser(userId uuid.UUID) (*User, error) {
 		INNER JOIN aspnet_Membership AS b ON a.UserId = b.UserId
 		INNER JOIN PartnerUsers AS c ON c.UserID = a.UserId
 		INNER JOIN Partners AS d ON d.ID = c.PartnerID
-		WHERE a.UserId = ?`, userId.String())
+		WHERE a.UserId = ?`, userId)
 	err := row.Scan(&UserId, &UserName, &Password, &PartnerID, &Email)
 	if err != nil {
 		log.Printf("Error in GetUser: %s", err)
@@ -259,10 +246,10 @@ func (u *UserRepository) GetUser(userId uuid.UUID) (*User, error) {
 
 func (u *UserRepository) Login(name string, pass string) (*User, error) {
 	var (
-		UserId    uuid.UUID
+		UserId    string
 		UserName  string
 		Password  string
-		PartnerID uuid.UUID
+		PartnerID string
 		Email     string
 	)
 	row := u.db.QueryRow(`
@@ -285,13 +272,13 @@ func (u *UserRepository) Login(name string, pass string) (*User, error) {
 	return newUser, nil
 }
 
-func (u *UserRepository) UserHasAdminPrivileges(userId uuid.UUID) (bool, error) {
+func (u *UserRepository) UserHasAdminPrivileges(userId string) (bool, error) {
 	var ()
 	rows, err := u.db.Query(`
 		SELECT c.RoleName FROM aspnet_Users AS a
 		INNER JOIN aspnet_UsersInRoles AS b ON a.UserId = b.UserId
 		INNER JOIN aspnet_Roles AS c ON c.RoleId = b.RoleId
-		WHERE a.UserId = ? AND c.RoleName = ? OR c.RoleName = ? OR c.RoleName = ?`, userId.String(), "Administrators", "SalesManager", "MarketingManager")
+		WHERE a.UserId = ? AND c.RoleName = ? OR c.RoleName = ? OR c.RoleName = ?`, userId, "Administrators", "SalesManager", "MarketingManager")
 	if err != nil {
 		return false, err
 	}

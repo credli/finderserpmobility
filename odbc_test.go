@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"flag"
 	_ "github.com/alexbrainman/odbc"
-	"log"
 	"runtime"
+	"testing"
 )
 
 var (
@@ -22,21 +22,21 @@ func getConnStr() string {
 	return "server=j7dpgj7zuc.database.secure.windows.net;driver=FreeTDS;port=1433;uid=finderserp@j7dpgj7zuc;pwd=Pl@c10!@#;database=FindersERPDB"
 }
 
-func main() {
+func TestConnectionAndBasicQuery(t *testing.T) {
 	db, err := sql.Open("odbc", getConnStr())
 	if err != nil {
-		reportError(err)
+		reportError(t, err)
 		return
 	}
 	defer db.Close()
 	err = db.Ping()
 	if err != nil {
-		reportError(err)
+		reportError(t, err)
 		return
 	}
 	rows, err := db.Query("select UserId, UserName from aspnet_Users;")
 	if err != nil {
-		reportError(err)
+		reportError(t, err)
 		return
 	}
 	defer rows.Close()
@@ -46,12 +46,12 @@ func main() {
 			userName string
 		)
 		rows.Scan(&userId, &userName)
-		log.Printf("UserID: %s\nUserName: %s", userId, userName)
+		t.Logf("UserID: %s\nUserName: %s", userId, userName)
 	}
-	log.Println("Connected successfully")
+	t.Logf("Connected successfully")
 
 }
 
-func reportError(err error) {
-	log.Printf("ERROR: %s\n", err.Error())
+func reportError(t *testing.T, err error) {
+	t.Errorf("ERROR: %s\n", err.Error())
 }

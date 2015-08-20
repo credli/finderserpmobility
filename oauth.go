@@ -34,6 +34,7 @@ func NewOAuthHandler(db *sql.DB) *OAuthHandler {
 }
 
 func (o *OAuthHandler) AuthorizeClient(w http.ResponseWriter, r *http.Request) {
+	_ = "breakpoint"
 	server := o.server
 	resp := server.NewResponse()
 	defer resp.Close()
@@ -53,6 +54,7 @@ func (o *OAuthHandler) AuthorizeClient(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *OAuthHandler) handleLoginPage(ar *osin.AuthorizeRequest, w http.ResponseWriter, r *http.Request) bool {
+	_ = "breakpoint"
 	r.ParseForm()
 	username := ""
 	password := ""

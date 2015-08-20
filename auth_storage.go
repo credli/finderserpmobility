@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/RangelReale/osin"
-	"github.com/pborman/uuid"
 	"time"
 )
 
@@ -73,7 +72,7 @@ func (s *AuthStorage) SaveAuthorize(auth *osin.AuthorizeData) error {
 		return err
 	}
 
-	_, err = stmt.Exec(auth.Code, auth.ExpiresIn, auth.Scope, auth.RedirectUri, auth.State, auth.CreatedAt, auth.Client.GetId(), user.UserId.String())
+	_, err = stmt.Exec(auth.Code, auth.ExpiresIn, auth.Scope, auth.RedirectUri, auth.State, auth.CreatedAt, auth.Client.GetId(), user.UserId)
 	return err
 }
 
@@ -86,7 +85,7 @@ func (s *AuthStorage) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 		state       string
 		createdAt   time.Time
 		clientID    string
-		userID      uuid.UUID
+		userID      string
 	)
 
 	row := s.db.QueryRow("SELECT * FROM authorize_data WHERE code = ?", code)
@@ -100,11 +99,7 @@ func (s *AuthStorage) LoadAuthorize(code string) (*osin.AuthorizeData, error) {
 		return nil, err
 	}
 
-	uid, err := toLittleEndian(userID)
-	if err != nil {
-		return nil, err
-	}
-	user, err := userRepo.GetUser(uid)
+	user, err := userRepo.GetUser(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +148,7 @@ func (s *AuthStorage) SaveAccess(access *osin.AccessData) error {
 	}
 
 	_, err = stmt.Exec(access.AccessToken, access.RefreshToken, access.ExpiresIn, access.Scope,
-		access.RedirectUri, access.CreatedAt, authDataCode, prevAccessDataToken, access.Client.GetId(), user.UserId.String())
+		access.RedirectUri, access.CreatedAt, authDataCode, prevAccessDataToken, access.Client.GetId(), user.UserId)
 	return err
 }
 
@@ -168,7 +163,7 @@ func (s *AuthStorage) loadAccess(token string, isRefresh ...bool) (*osin.AccessD
 		authorizeDataCode   string
 		prevAccessDataToken string
 		clientID            string
-		userID              uuid.UUID
+		userID              string
 	)
 
 	var rows *sql.Rows
@@ -198,11 +193,7 @@ func (s *AuthStorage) loadAccess(token string, isRefresh ...bool) (*osin.AccessD
 		return nil, "", "", "", errors.New(fmt.Sprintf("%s %s was not scanned", whichToken, token))
 	}
 
-	uid, err := toLittleEndian(userID)
-	if err != nil {
-		return nil, "", "", "", err
-	}
-	user, err := userRepo.GetUser(uid)
+	user, err := userRepo.GetUser(userID)
 	if err != nil {
 		return nil, "", "", "", err
 	}

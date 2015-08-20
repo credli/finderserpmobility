@@ -2,6 +2,8 @@
 *.o
 *.a
 *.so
+finderserpmobility
+*.debug
 
 # Folders
 _obj
