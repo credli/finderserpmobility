@@ -25,7 +25,7 @@ var (
 )
 
 func main() {
-	db, err := sql.Open(config.DbDriverName, config.DbConnectionString)
+	db, err := sql.Open("odbc", config.DbConnectionString)
 	//db.SetMaxIdleConns(0)
 	if err != nil {
 		log.Panicln(err)

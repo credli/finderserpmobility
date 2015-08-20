@@ -4,26 +4,27 @@ import (
 	"database/sql"
 	"flag"
 	_ "github.com/alexbrainman/odbc"
-	"runtime"
+	"os"
 	"testing"
 )
 
 var (
-	connStr = flag.String("dsn", "", "ODBC DSN to override")
+	connStr = flag.String("connStr", "", "ODBC DSN to override")
 )
 
-func getConnStr() string {
+func getConnStr(t *testing.T) string {
 	if connStr != nil && *connStr != "" {
 		return *connStr
 	}
-	if runtime.GOOS == "windows" {
-		return "DRIVER=SQL Server Native Client 11.0;Server=j7dpgj7zuc.database.secure.windows.net;uid=finderserp@j7dpgj7zuc;pwd=Pl@c10!@#;database=FindersERPDB;Encrypt=yes;TrustServerCertificate=no;"
+	connectionstring := os.Getenv("FINDERSERP_MOBILITY_CONNECTIONSTRING")
+	if connectionstring == "" {
+		t.Fatal("No connection string was available. Try running the test again specifying the connStr flag.")
 	}
-	return "server=j7dpgj7zuc.database.secure.windows.net;driver=FreeTDS;port=1433;uid=finderserp@j7dpgj7zuc;pwd=Pl@c10!@#;database=FindersERPDB"
+	return connectionstring
 }
 
 func TestConnectionAndBasicQuery(t *testing.T) {
-	db, err := sql.Open("odbc", getConnStr())
+	db, err := sql.Open("odbc", getConnStr(t))
 	if err != nil {
 		reportError(t, err)
 		return
