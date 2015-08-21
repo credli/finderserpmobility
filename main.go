@@ -13,7 +13,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
-	//"runtime"
+	"runtime"
 	"strconv"
 )
 
@@ -29,7 +29,7 @@ type Repository interface{}
 
 func main() {
 	//enable parallelism
-	//runtime.GOMAXPROCS(4)
+	runtime.GOMAXPROCS(2)
 
 	db, err := sql.Open("odbc", config.DbConnectionString)
 	//db.SetMaxIdleConns(0)

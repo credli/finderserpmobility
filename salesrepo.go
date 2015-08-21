@@ -3,6 +3,8 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	//"sync"
+	// "errors"
 	"time"
 )
 
@@ -17,40 +19,9 @@ func NewSalesOrderRepository(db *sql.DB) *SalesOrderRepository {
 	}
 }
 
-func (s *SalesOrderRepository) fetchItemsForOrder(salesOrderId string, itemsChan chan<- []*SalesOrderItem, errChan chan error) {
-	var salesOrderItems = make([]*SalesOrderItem, 0)
-
-	rows, err := s.db.Query("exec Mobile_GetSalesOrderItems @SalesOrderID = ?;", salesOrderId)
-	if err != nil {
-		errChan <- err
-		return
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var (
-			soId               string
-			salesoid           string
-			productName        string
-			pricePerKg         float64
-			discountPercentage float64
-			unitName           string
-			qtyInKg            int
-			deliveryDeadline   time.Time
-		)
-		rows.Scan(&soId, &salesoid, &productName, &pricePerKg, &discountPercentage, &unitName, &qtyInKg, &deliveryDeadline)
-		salesOrderItem, err := NewSalesOrderItem(soId, salesoid, productName, pricePerKg, discountPercentage, unitName, qtyInKg, deliveryDeadline)
-		if err != nil {
-			errChan <- err
-			return
-		}
-		salesOrderItems = append(salesOrderItems, salesOrderItem)
-	}
-
-	itemsChan <- salesOrderItems
-}
-
 func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeItems bool) ([]*SalesOrder, error) {
 	fmt.Printf("Started:%v\n", time.Now())
+
 	salesOrders := make([]*SalesOrder, 0)
 	rows, err := s.db.Query("exec Mobile_GetPendingSalesOrders @PartnerID = ?;", partnerId)
 	if err != nil {
@@ -79,19 +50,61 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 		itemsChan := make(chan []*SalesOrderItem)
 		errChan := make(chan error)
 
-		counter := 0
+		ordersCount := len(salesOrders)
 
-		for _, so := range salesOrders {
-			go s.fetchItemsForOrder(so.ID, itemsChan, errChan)
-			counter++
+		for i := 0; i < ordersCount; i++ {
+			go func(salesOrderId string) {
+				db, err := sql.Open("odbc", config.DbConnectionString)
+				if err != nil {
+					errChan <- err
+					return
+				}
+				defer db.Close()
+
+				rows, err := db.Query("exec Mobile_GetSalesOrderItems @SalesOrderID = ?;", salesOrderId)
+				if err != nil {
+					errChan <- err
+					return
+				}
+				defer rows.Close()
+
+				var salesOrderItems = make([]*SalesOrderItem, 0)
+				for rows.Next() {
+					var (
+						soId               string
+						salesoid           string
+						productName        string
+						pricePerKg         float64
+						discountPercentage float64
+						unitName           string
+						qtyInKg            int
+						deliveryDeadline   time.Time
+					)
+					rows.Scan(&soId, &salesoid, &productName, &pricePerKg, &discountPercentage, &unitName, &qtyInKg, &deliveryDeadline)
+					salesOrderItem, err := NewSalesOrderItem(soId, salesoid, productName, pricePerKg, discountPercentage, unitName, qtyInKg, deliveryDeadline)
+					if err != nil {
+						errChan <- err
+						return
+					}
+					salesOrderItems = append(salesOrderItems, salesOrderItem)
+				}
+				itemsChan <- salesOrderItems
+			}(salesOrders[i].ID)
 		}
 
-		for _, so := range salesOrders {
+		for i := 0; i < ordersCount; i++ {
 			select {
 			case items := <-itemsChan:
-				//put salesOrderItems in salesOrders
-				for _, soi := range items {
-					so.AddItem(soi)
+				if len(items) > 0 {
+					soId := items[0].SalesOrderID //just pick the first item, info is the same in all other items
+					for _, so := range salesOrders {
+						if so.ID == soId {
+							for _, soi := range items {
+								so.AddItem(soi)
+							}
+							break
+						}
+					}
 				}
 			case err := <-errChan:
 				return nil, err
