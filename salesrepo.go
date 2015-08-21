@@ -17,14 +17,15 @@ func NewSalesOrderRepository(db *sql.DB) *SalesOrderRepository {
 	}
 }
 
-func (s *SalesOrderRepository) GetSalesOrderItems(salesOrderId string) ([]*SalesOrderItem, error) {
+func (s *SalesOrderRepository) fetchItemsForOrder(salesOrderId string, itemsChan chan<- []*SalesOrderItem, errChan chan error) {
 	var salesOrderItems = make([]*SalesOrderItem, 0)
+
 	rows, err := s.db.Query("exec Mobile_GetSalesOrderItems @SalesOrderID = ?;", salesOrderId)
 	if err != nil {
-		return nil, err
+		errChan <- err
+		return
 	}
 	defer rows.Close()
-
 	for rows.Next() {
 		var (
 			soId               string
@@ -37,14 +38,15 @@ func (s *SalesOrderRepository) GetSalesOrderItems(salesOrderId string) ([]*Sales
 			deliveryDeadline   time.Time
 		)
 		rows.Scan(&soId, &salesoid, &productName, &pricePerKg, &discountPercentage, &unitName, &qtyInKg, &deliveryDeadline)
-		salesOrderItem, err := NewSalesOrderItem(soId, productName, pricePerKg, discountPercentage, unitName, qtyInKg, deliveryDeadline)
+		salesOrderItem, err := NewSalesOrderItem(soId, salesoid, productName, pricePerKg, discountPercentage, unitName, qtyInKg, deliveryDeadline)
 		if err != nil {
-			return nil, err
+			errChan <- err
+			return
 		}
 		salesOrderItems = append(salesOrderItems, salesOrderItem)
 	}
 
-	return salesOrderItems, nil
+	itemsChan <- salesOrderItems
 }
 
 func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeItems bool) ([]*SalesOrder, error) {
@@ -74,13 +76,25 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 
 	_ = "breakpoint"
 	if includeItems == true {
+		itemsChan := make(chan []*SalesOrderItem)
+		errChan := make(chan error)
+
+		counter := 0
+
 		for _, so := range salesOrders {
-			items, err := s.GetSalesOrderItems(so.ID)
-			if err != nil {
+			go s.fetchItemsForOrder(so.ID, itemsChan, errChan)
+			counter++
+		}
+
+		for _, so := range salesOrders {
+			select {
+			case items := <-itemsChan:
+				//put salesOrderItems in salesOrders
+				for _, soi := range items {
+					so.AddItem(soi)
+				}
+			case err := <-errChan:
 				return nil, err
-			}
-			for _, soi := range items {
-				so.AddItem(soi)
 			}
 		}
 	}
@@ -159,6 +173,7 @@ func (s *SalesOrder) CalculateGrandTotal() float64 {
 
 type SalesOrderItem struct {
 	ID               string    `json:"id"`
+	SalesOrderID     string    `json:"salesOrderId"`
 	ProductName      string    `json:"productName"`
 	PricePerKG       float64   `json:"pricePerKG"`
 	DiscountPercent  float64   `json:"discountPercent"`
@@ -168,9 +183,10 @@ type SalesOrderItem struct {
 	LineTotal        float64   `json:"lineTotal"`
 }
 
-func NewSalesOrderItem(id string, productName string, price float64, discountPercent float64, unitName string, qty int, deliveryDeadline time.Time) (*SalesOrderItem, error) {
+func NewSalesOrderItem(id string, soid string, productName string, price float64, discountPercent float64, unitName string, qty int, deliveryDeadline time.Time) (*SalesOrderItem, error) {
 	return &SalesOrderItem{
 		ID:               id,
+		SalesOrderID:     soid,
 		ProductName:      productName,
 		PricePerKG:       price,
 		DiscountPercent:  discountPercent,
