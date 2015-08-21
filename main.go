@@ -24,6 +24,8 @@ var (
 	templates = template.Must(template.ParseGlob("tmpl/*.html"))
 )
 
+type Repository interface{}
+
 func main() {
 	db, err := sql.Open("odbc", config.DbConnectionString)
 	//db.SetMaxIdleConns(0)
