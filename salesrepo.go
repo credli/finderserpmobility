@@ -61,15 +61,15 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 				}
 				defer db.Close()
 
-				rows, err := db.Query("exec Mobile_GetSalesOrderItems @SalesOrderID = ?;", salesOrderId)
+				rows2, err := db.Query("exec Mobile_GetSalesOrderItems @SalesOrderID = ?;", salesOrderId)
 				if err != nil {
 					errChan <- err
 					return
 				}
-				defer rows.Close()
+				defer rows2.Close()
 
 				var salesOrderItems = make([]*SalesOrderItem, 0)
-				for rows.Next() {
+				for rows2.Next() {
 					var (
 						soId               string
 						salesoid           string
@@ -80,7 +80,7 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 						qtyInKg            int
 						deliveryDeadline   time.Time
 					)
-					rows.Scan(&soId, &salesoid, &productName, &pricePerKg, &discountPercentage, &unitName, &qtyInKg, &deliveryDeadline)
+					rows2.Scan(&soId, &salesoid, &productName, &pricePerKg, &discountPercentage, &unitName, &qtyInKg, &deliveryDeadline)
 					salesOrderItem, err := NewSalesOrderItem(soId, salesoid, productName, pricePerKg, discountPercentage, unitName, qtyInKg, deliveryDeadline)
 					if err != nil {
 						errChan <- err
