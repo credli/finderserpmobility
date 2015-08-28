@@ -1,0 +1,11 @@
+.logo-bg {
+	background-color: #d1eefc;
+	margin-bottom: 10px;
+}
+
+.logo-bg img {
+	display: block;
+	margin: 0 auto;
+	width: 215px;
+	height: 90px;
+}

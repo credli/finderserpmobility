@@ -20,6 +20,7 @@ import (
 var (
 	salesOrderRepo *SalesOrderRepository
 	userRepo       *UserRepository
+	productsRepo   *ProductsRepository
 
 	config    = c.NewConfig()
 	templates = template.Must(template.ParseGlob("tmpl/*.html"))
@@ -44,6 +45,7 @@ func main() {
 	//repositories
 	salesOrderRepo = NewSalesOrderRepository(db)
 	userRepo = NewUserRepository(db)
+	productsRepo = NewProductsRepository(db)
 	oAuth := NewOAuthHandler(db)
 
 	if _, err := oAuth.Storage.GetClient("finderserpmobilityapp"); err != nil {
@@ -69,6 +71,8 @@ func main() {
 	mainRouter.HandleFunc("/sales/pending/{partnerId}", oAuth.MiddlewareFunc(handlePendingSalesOrders)).Methods("GET")
 	mainRouter.HandleFunc("/sales/approve/{salesOrderId}", oAuth.MiddlewareFunc(handleApproveSalesOrder)).Methods("POST")
 	mainRouter.HandleFunc("/sales/reject/{salesOrderId}", oAuth.MiddlewareFunc(handleRejectSalesOrder)).Methods("POST")
+	mainRouter.HandleFunc("/products", handleProducts).Methods("GET")
+
 	//static routes
 	http.HandleFunc("/static/", handleStatic)
 	http.Handle("/", mainRouter)
@@ -199,6 +203,23 @@ func handleRejectSalesOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	result, desc, err := salesOrderRepo.RejectSalesOrder(salesOrderId, reason, user.UserId)
 	writeResult(w, result, desc, err)
+}
+
+func handleProducts(w http.ResponseWriter, r *http.Request) {
+	products, err := productsRepo.GetProducts()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("%s\n", err)
+		return
+	}
+	b, err := json.Marshal(products)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("%s\n", err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(b)
 }
 
 func writeResult(w http.ResponseWriter, result, description string, err error) {

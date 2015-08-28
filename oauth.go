@@ -53,6 +53,7 @@ func (o *OAuthHandler) AuthorizeClient(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *OAuthHandler) handleLoginPage(ar *osin.AuthorizeRequest, w http.ResponseWriter, r *http.Request) bool {
+	_ = "breakpoint"
 	r.ParseForm()
 	username := ""
 	password := ""
@@ -63,7 +64,10 @@ func (o *OAuthHandler) handleLoginPage(ar *osin.AuthorizeRequest, w http.Respons
 		user, _ := userRepo.Login(username, password)
 		ar.UserData = user
 		loginError = (user == nil)
-		return (user != nil)
+		if user != nil || loginError == false {
+			return true
+		}
+		//return (user != nil)
 	}
 	page := &LoginPage{
 		ResponseType: ar.Type,
