@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	//"sync"
 	// "errors"
 	"time"
@@ -19,13 +18,11 @@ func NewSalesOrderRepository(db *sql.DB) *SalesOrderRepository {
 	}
 }
 
-func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeItems bool) ([]*SalesOrder, error) {
-	fmt.Printf("Started:%v\n", time.Now())
-
+func (s *SalesOrderRepository) GetPendingSalesOrders(result *[]*SalesOrder, partnerId string, includeItems bool) error {
 	salesOrders := make([]*SalesOrder, 0)
 	rows, err := s.db.Query("exec Mobile_GetPendingSalesOrders @PartnerID = ?;", partnerId)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer rows.Close()
 
@@ -40,12 +37,11 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 		rows.Scan(&id, &seqNumber, &addedBy, &addedDate, &customerName)
 		salesOrder, err := NewSalesOrder(id, seqNumber, addedBy, addedDate, customerName)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		salesOrders = append(salesOrders, salesOrder)
 	}
 
-	_ = "breakpoint"
 	if includeItems == true {
 		itemsChan := make(chan []*SalesOrderItem)
 		errChan := make(chan error)
@@ -71,7 +67,7 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 				var salesOrderItems = make([]*SalesOrderItem, 0)
 				for rows2.Next() {
 					var (
-						soId               string
+						soid               string
 						salesoid           string
 						productName        string
 						pricePerKg         float64
@@ -80,8 +76,8 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 						qtyInKg            int
 						deliveryDeadline   time.Time
 					)
-					rows2.Scan(&soId, &salesoid, &productName, &pricePerKg, &discountPercentage, &unitName, &qtyInKg, &deliveryDeadline)
-					salesOrderItem, err := NewSalesOrderItem(soId, salesoid, productName, pricePerKg, discountPercentage, unitName, qtyInKg, deliveryDeadline)
+					rows2.Scan(&soid, &salesoid, &productName, &pricePerKg, &discountPercentage, &unitName, &qtyInKg, &deliveryDeadline)
+					salesOrderItem, err := NewSalesOrderItem(soid, salesoid, productName, pricePerKg, discountPercentage, unitName, qtyInKg, deliveryDeadline)
 					if err != nil {
 						errChan <- err
 						return
@@ -96,9 +92,9 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 			select {
 			case items := <-itemsChan:
 				if len(items) > 0 {
-					soId := items[0].SalesOrderID //just pick the first item, info is the same in all other items
+					id := items[0].SalesOrderID //just pick the first item, info is the same in all other items
 					for _, so := range salesOrders {
-						if so.ID == soId {
+						if so.ID == id {
 							for _, soi := range items {
 								so.AddItem(soi)
 							}
@@ -107,13 +103,12 @@ func (s *SalesOrderRepository) GetPendingSalesOrders(partnerId string, includeIt
 					}
 				}
 			case err := <-errChan:
-				return nil, err
+				return err
 			}
 		}
 	}
-	fmt.Printf("Ended:%v\n", time.Now())
-
-	return salesOrders, nil
+	*result = salesOrders
+	return nil
 }
 
 func (s *SalesOrderRepository) ApproveSalesOrder(salesOrderId string, generateDeliveryRequest bool, userId string) (string, string, error) {

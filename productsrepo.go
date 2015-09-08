@@ -21,6 +21,7 @@ type Product struct {
 	MainPurpose      string    `json:"main_purpose"`
 	Features         string    `json:"features"`
 	FormulaRef       string    `json:"formula_ref"`
+	ERPID            string    `json:"erp_id"`
 }
 
 type ProductsRepository struct {
@@ -42,7 +43,7 @@ func NewCategory(id, name string) *Category {
 	}
 }
 
-func NewProduct(id string, category *Category, subCategoryID, subCategoryName, name, shortDescription, description, mainPurpose, features, formulaRef string) *Product {
+func NewProduct(id string, category *Category, subCategoryID, subCategoryName, name, shortDescription, description, mainPurpose, features, formulaRef string, erpID string) *Product {
 	return &Product{
 		ID:               id,
 		Category:         category,
@@ -54,11 +55,12 @@ func NewProduct(id string, category *Category, subCategoryID, subCategoryName, n
 		MainPurpose:      mainPurpose,
 		Features:         features,
 		FormulaRef:       formulaRef,
+		ERPID:            erpID,
 	}
 }
 
 func (p *ProductsRepository) GetProducts() ([]*Product, error) {
-	products := make([]*Product, 0)
+	var products []*Product
 	rows, err := p.db.Query("exec Mobile_GetProductsFlat;")
 	if err != nil {
 		return nil, err
@@ -68,9 +70,9 @@ func (p *ProductsRepository) GetProducts() ([]*Product, error) {
 	for rows.Next() {
 		var (
 			id               string
-			categoryId       string
+			categoryID       string
 			cateogryName     string
-			subCategoryId    string
+			subCategoryID    string
 			subCategoryName  string
 			name             string
 			shortDescription string
@@ -78,10 +80,11 @@ func (p *ProductsRepository) GetProducts() ([]*Product, error) {
 			mainPurpose      string
 			features         string
 			formulaRef       string
+			erpID            string
 		)
-		rows.Scan(&id, &categoryId, &cateogryName, &subCategoryId, &subCategoryName, &name, &shortDescription, &description, &mainPurpose, &features, &formulaRef)
-		category := NewCategory(categoryId, cateogryName)
-		product := NewProduct(id, category, subCategoryId, subCategoryName, name, shortDescription, description, mainPurpose, features, formulaRef)
+		rows.Scan(&id, &categoryID, &cateogryName, &subCategoryID, &subCategoryName, &name, &shortDescription, &description, &mainPurpose, &features, &formulaRef, &erpID)
+		category := NewCategory(categoryID, cateogryName)
+		product := NewProduct(id, category, subCategoryID, subCategoryName, name, shortDescription, description, mainPurpose, features, formulaRef, erpID)
 		products = append(products, product)
 	}
 	return products, nil
